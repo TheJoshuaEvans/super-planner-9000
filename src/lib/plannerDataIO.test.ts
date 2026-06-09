@@ -40,6 +40,24 @@ describe("plannerDataIO", () => {
     expect(text).toContain("\n  \"data\": {");
   });
 
+  it("strips non-persisted fields like history from exported data", () => {
+    const exportedAt = new Date("2026-06-09T12:34:56.000Z");
+    const envelope = createPlannerDataExportEnvelope(
+      {
+        ...sampleData,
+        history: {
+          past: [{ categories: [], segmentsByDate: {} }],
+          present: sampleData,
+          future: []
+        }
+      } as unknown as typeof sampleData,
+      exportedAt
+    );
+
+    expect(envelope.data).toEqual(sampleData);
+    expect(envelope.data).not.toHaveProperty("history");
+  });
+
   it("builds a predictable export filename", () => {
     const filename = buildPlannerExportFilename(new Date("2026-06-09T12:34:56.000Z"));
 

@@ -1,3 +1,5 @@
+import { getTimelineControlButtonClassName } from "./timelineControlButton";
+
 type PlannerHistoryControlsProps = {
   canUndo: boolean;
   canRedo: boolean;
@@ -15,11 +17,7 @@ function PlannerHistoryControls({ canUndo, canRedo, onUndo, onRedo }: PlannerHis
         type="button"
         onClick={onUndo}
         disabled={!canUndo}
-        className={`rounded-md border px-2 py-1 text-[0.68rem] font-semibold uppercase tracking-wide transition ${
-          canUndo
-            ? "border-app-border bg-app-panel/85 text-app-muted hover:border-app-accent/70 hover:text-app-text"
-            : "cursor-not-allowed border-app-border/70 bg-app-panel/45 text-app-muted/55"
-        }`}
+        className={getTimelineControlButtonClassName(canUndo)}
         aria-label="Undo day planner change"
       >
         Undo
@@ -29,11 +27,7 @@ function PlannerHistoryControls({ canUndo, canRedo, onUndo, onRedo }: PlannerHis
         type="button"
         onClick={onRedo}
         disabled={!canRedo}
-        className={`rounded-md border px-2 py-1 text-[0.68rem] font-semibold uppercase tracking-wide transition ${
-          canRedo
-            ? "border-app-border bg-app-panel/85 text-app-muted hover:border-app-accent/70 hover:text-app-text"
-            : "cursor-not-allowed border-app-border/70 bg-app-panel/45 text-app-muted/55"
-        }`}
+        className={getTimelineControlButtonClassName(canRedo)}
         aria-label="Redo day planner change"
       >
         Redo

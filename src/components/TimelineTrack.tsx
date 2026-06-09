@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import {
   clientXToSlot,
   DEFAULT_SEGMENT_DURATION_SLOTS,
@@ -11,7 +11,19 @@ import {
   snapSlot,
   TOTAL_DAY_SLOTS
 } from "../lib/timeline";
+import { resolveCurrentTimePercent } from "../lib/timelineNow";
+import { useTimelineMarkerClock } from "../hooks/useTimelineMarkerClock";
 import type { PlannerCategory, PlannerSegment } from "../store/plannerStore";
+import {
+  isPointerInRect,
+  resolveDropPreviewSlot,
+  resolveMoveStart,
+  resolveResizeRange,
+  type InteractionState,
+  type MoveInteraction,
+  type ResizeInteraction
+} from "./timelineTrackInteractions";
+import { getTimelineControlButtonClassName } from "./timelineControlButton";
 import Tooltip from "./Tooltip";
 
 type TimelineTrackProps = {
@@ -31,77 +43,6 @@ type TimelineTrackProps = {
   footer?: ReactNode;
   showCurrentTimeMarker?: boolean;
 };
-
-type MoveInteraction = {
-  mode: "move";
-  segmentId: string;
-  duration: number;
-  grabOffsetSlots: number;
-  previewStartSlot: number;
-};
-
-type ResizeInteraction = {
-  mode: "resize-left" | "resize-right";
-  segmentId: string;
-  fixedStartSlot: number;
-  fixedEndSlot: number;
-  previewStartSlot: number;
-  previewEndSlot: number;
-};
-
-type InteractionState = MoveInteraction | ResizeInteraction;
-
-const MIN_RESIZE_SLOTS = 1;
-
-/**
- * Maps the current local wall-clock time into the timeline's 15-minute-slot domain.
- */
-function resolveCurrentTimeSlot(currentTime: Date): number {
-  const dayFraction = currentTime.getHours() + currentTime.getMinutes() / 60 + currentTime.getSeconds() / 3600;
-  return Math.max(0, Math.min(TOTAL_DAY_SLOTS, (dayFraction / 24) * TOTAL_DAY_SLOTS));
-}
-
-/**
- * Resolves the clamped start slot for a move interaction from a pointer position.
- */
-function resolveMoveStart(clientX: number, interaction: MoveInteraction, trackEl: HTMLDivElement): number {
-  const rect = trackEl.getBoundingClientRect();
-  const raw = snapSlot(clientXToSlot(clientX, rect.left, rect.width)) - interaction.grabOffsetSlots;
-  const max = TOTAL_DAY_SLOTS - interaction.duration;
-  return Math.max(0, Math.min(max, raw));
-}
-
-/**
- * Resolves the preview slot range for a resize interaction from a pointer position.
- */
-function resolveResizeRange(
-  clientX: number,
-  interaction: ResizeInteraction,
-  trackEl: HTMLDivElement
-): { startSlot: number; endSlot: number } {
-  const rect = trackEl.getBoundingClientRect();
-  const slot = snapSlot(clientXToSlot(clientX, rect.left, rect.width));
-
-  if (interaction.mode === "resize-left") {
-    const start = Math.max(0, Math.min(slot, interaction.fixedEndSlot - MIN_RESIZE_SLOTS));
-    return { startSlot: start, endSlot: interaction.fixedEndSlot };
-  } else {
-    const end = Math.min(TOTAL_DAY_SLOTS, Math.max(slot, interaction.fixedStartSlot + MIN_RESIZE_SLOTS));
-    return { startSlot: interaction.fixedStartSlot, endSlot: end };
-  }
-}
-
-/**
- * Returns true when the pointer coordinate is inside the given element bounds.
- */
-function isPointerInElement(clientX: number, clientY: number, element: HTMLElement | null): boolean {
-  if (!element) {
-    return false;
-  }
-
-  const rect = element.getBoundingClientRect();
-  return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
-}
 
 /**
  * Renders the day timeline grid and any scheduled segments placed on it.
@@ -127,29 +68,15 @@ function TimelineTrack({
   const trashRef = useRef<HTMLDivElement | null>(null);
   const [interaction, setInteraction] = useState<InteractionState | null>(null);
   const [dropPreviewSlot, setDropPreviewSlot] = useState<number | null>(null);
-  const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
   const [isTrashHot, setIsTrashHot] = useState(false);
-
-  useEffect(() => {
-    if (!showCurrentTimeMarker) {
-      return;
-    }
-
-    const intervalId = window.setInterval(() => {
-      setCurrentTime(new Date());
-    }, 30_000);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, [showCurrentTimeMarker]);
+  const currentTime = useTimelineMarkerClock({ enabled: showCurrentTimeMarker });
 
   const categoriesById = useMemo(
     () => new Map(categories.map((category) => [category.id, category])),
     [categories]
   );
   const currentTimePercent = useMemo(
-    () => Math.max(0, Math.min(100, (resolveCurrentTimeSlot(currentTime) / TOTAL_DAY_SLOTS) * 100)),
+    () => resolveCurrentTimePercent(currentTime),
     [currentTime]
   );
   const currentTimeLabel = useMemo(
@@ -233,20 +160,22 @@ function TimelineTrack({
     if (!trackRef.current) return;
 
     if (draggingCategoryId) {
-      const slot = snapSlot(clientXToSlot(event.clientX, trackRef.current.getBoundingClientRect().left, trackRef.current.getBoundingClientRect().width));
-      const clamped = Math.min(slot, TOTAL_DAY_SLOTS - DEFAULT_SEGMENT_DURATION_SLOTS);
-      setDropPreviewSlot(Math.max(0, clamped));
+      const trackRect = trackRef.current.getBoundingClientRect();
+      setDropPreviewSlot(resolveDropPreviewSlot(event.clientX, trackRect.left, trackRect.width));
       return;
     }
 
     if (!interaction) return;
 
     if (interaction.mode === "move") {
-      const nextStart = resolveMoveStart(event.clientX, interaction, trackRef.current);
-      setIsTrashHot(isPointerInElement(event.clientX, event.clientY, trashRef.current));
+      const trackRect = trackRef.current.getBoundingClientRect();
+      const nextStart = resolveMoveStart(event.clientX, interaction, trackRect.left, trackRect.width);
+      const trashRect = trashRef.current?.getBoundingClientRect();
+      setIsTrashHot(trashRect ? isPointerInRect(event.clientX, event.clientY, trashRect) : false);
       setInteraction((prev) => prev ? { ...prev, previewStartSlot: nextStart } as MoveInteraction : prev);
     } else {
-      const { startSlot, endSlot } = resolveResizeRange(event.clientX, interaction, trackRef.current);
+      const trackRect = trackRef.current.getBoundingClientRect();
+      const { startSlot, endSlot } = resolveResizeRange(event.clientX, interaction, trackRect.left, trackRect.width);
       setIsTrashHot(false);
       setInteraction((prev) => prev ? { ...prev, previewStartSlot: startSlot, previewEndSlot: endSlot } as ResizeInteraction : prev);
     }
@@ -265,7 +194,9 @@ function TimelineTrack({
 
     if (!interaction) return;
 
-    if (interaction.mode === "move" && isPointerInElement(event.clientX, event.clientY, trashRef.current)) {
+    const trashRect = trashRef.current?.getBoundingClientRect();
+
+    if (interaction.mode === "move" && trashRect && isPointerInRect(event.clientX, event.clientY, trashRect)) {
       onDeleteSegment(interaction.segmentId);
       setInteraction(null);
       setIsTrashHot(false);
@@ -308,7 +239,7 @@ function TimelineTrack({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="rounded-md border border-app-border bg-app-panel/85 px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-app-muted transition hover:border-app-accent/70 hover:text-app-text"
+            className={getTimelineControlButtonClassName(true)}
             onClick={onCopyTimeline}
           >
             Copy
@@ -316,11 +247,7 @@ function TimelineTrack({
 
           <button
             type="button"
-            className={`rounded-md border border-app-border bg-app-panel/85 px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-app-muted transition ${
-              canPasteTimeline
-                ? "hover:border-app-accent/70 hover:text-app-text"
-                : "cursor-not-allowed opacity-50"
-            }`}
+            className={getTimelineControlButtonClassName(canPasteTimeline)}
             onClick={onPasteTimeline}
             disabled={!canPasteTimeline}
             aria-disabled={!canPasteTimeline}

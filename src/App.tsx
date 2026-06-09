@@ -6,12 +6,25 @@ import PortraitWarningOverlay from "./components/PortraitWarningOverlay";
 import ToastViewport from "./components/ToastViewport";
 import TimelineTrack from "./components/TimelineTrack";
 import { usePlannerUndoRedoHotkeys } from "./hooks/usePlannerUndoRedoHotkeys";
-import { formatCalendarDateLabel, getRelativeCalendarDateKey, parseCalendarDateKey } from "./lib/calendar";
+import {
+  ACTIVE_TAB_LOCAL_STORAGE_KEY,
+  APP_TABS,
+  getAppTabDefinition,
+  isAppTab
+} from "./lib/appTabs";
+import type { AppTab } from "./lib/appTabs";
+import { formatCalendarDateLabel, getRelativeCalendarDateKey } from "./lib/calendar";
 import {
   buildPlannerExportFilename,
   parsePlannerDataImport,
   serializePlannerDataExport
 } from "./lib/plannerDataIO";
+import {
+  formatDashboardDateSubtitle,
+  formatDashboardWeekdayLabel,
+  formatPasteTargetLabel,
+  getMealPlannerRelativeLabel
+} from "./lib/plannerViewHelpers";
 import { formatSlotRangeLabelMeridiem } from "./lib/timeline";
 import { usePlannerStore } from "./store/plannerStore";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
@@ -19,43 +32,17 @@ import { useToastStore } from "./store/toastStore";
 import type { PlannerDateKey, PlannerSegment } from "./store/plannerStore";
 
 const PORTRAIT_WARNING_SESSION_KEY = "sp9000-portrait-warning-dismissed";
-const ACTIVE_TAB_LOCAL_STORAGE_KEY = "sp9000-active-tab";
 
-const APP_TABS = [
-  {
-    id: "day-planner",
-    label: "Day Planner",
-    kicker: "Daily Timeline Planner",
-    description:
-      "Plan your day with draggable timeline blocks, copy and paste patterns across dates, and preview how each calendar day is filling up at a glance. Today and tomorrow stay pinned up top, while any date you select from the calendar opens in the docked editor below.",
-    contentKind: "day-planner"
-  },
-  {
-    id: "meal-planner",
-    label: "Meal Planner",
-    kicker: "Meal Planner",
-    description: "Review your day through a meal-planning lens, with food blocks emphasized and everything else subdued.",
-    contentKind: "meal-planner"
-  },
-  {
-    id: "meal-generator",
-    label: "Meal Generator",
-    kicker: "Meal Generator",
-    description: "Stub page for upcoming meal generation workflows.",
-    contentKind: "placeholder"
-  }
+/**
+ * Day Planner dashboard timeline configuration.
+ * Each entry describes one pinned timeline row shown at the top of the Day Planner.
+ * Offset 0 = today; subsequent offsets extend into future days.
+ */
+const DASHBOARD_TIMELINE_ROWS = [
+  { title: "Today", offset: 0, showCurrentTimeMarker: true },
+  { title: "Tomorrow", offset: 1, showCurrentTimeMarker: false },
+  { title: "Day after Tomorrow", offset: 2, showCurrentTimeMarker: false }
 ] as const;
-
-type AppTab = (typeof APP_TABS)[number]["id"];
-type AppTabDefinition = (typeof APP_TABS)[number];
-
-function isAppTab(value: string | null): value is AppTab {
-  return APP_TABS.some((tab) => tab.id === value);
-}
-
-function getAppTabDefinition(tabId: AppTab): AppTabDefinition {
-  return APP_TABS.find((tab) => tab.id === tabId) ?? APP_TABS[0];
-}
 
 /**
  * Composes the planner page shell from the timeline track and category palette.
@@ -83,13 +70,8 @@ function App() {
     return isAppTab(storedTab) ? storedTab : APP_TABS[0].id;
   });
 
-  const todayDateKey = getRelativeCalendarDateKey(0);
-  const tomorrowDateKey = getRelativeCalendarDateKey(1);
-  const dayAfterTomorrowDateKey = getRelativeCalendarDateKey(2);
+  const dashboardDateKeys = DASHBOARD_TIMELINE_ROWS.map((row) => getRelativeCalendarDateKey(row.offset));
   const mealPlannerWeekDateKeys = Array.from({ length: 7 }, (_, offset) => getRelativeCalendarDateKey(offset));
-  const todaySegments = segmentsByDate[todayDateKey] ?? [];
-  const tomorrowSegments = segmentsByDate[tomorrowDateKey] ?? [];
-  const dayAfterTomorrowSegments = segmentsByDate[dayAfterTomorrowDateKey] ?? [];
 
   const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
   const [copiedTimelineSegments, setCopiedTimelineSegments] = useState<PlannerSegment[] | null>(null);
@@ -120,82 +102,6 @@ function App() {
     onUndo: undoPlannerEdit,
     onRedo: redoPlannerEdit
   });
-
-  function formatDateKeyList(dateKeys: PlannerDateKey[]): string {
-    return dateKeys.map((dateKey) => formatCalendarDateLabel(dateKey)).join(", ");
-  }
-
-  function formatDashboardDateSubtitle(dateKey: PlannerDateKey): string {
-    const parsedDate = parseCalendarDateKey(dateKey);
-
-    if (!parsedDate) {
-      return dateKey;
-    }
-
-    return new Intl.DateTimeFormat("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric"
-    }).format(parsedDate);
-  }
-
-  function formatDashboardWeekdayLabel(dateKey: PlannerDateKey): string {
-    const parsedDate = parseCalendarDateKey(dateKey);
-
-    if (!parsedDate) {
-      return "";
-    }
-
-    return new Intl.DateTimeFormat("en-US", {
-      weekday: "long"
-    }).format(parsedDate);
-  }
-
-  function formatPasteTargetLabel(dateKeys: PlannerDateKey[]): string {
-    if (dateKeys.length === 1) {
-      return formatCalendarDateLabel(dateKeys[0]);
-    }
-
-    const parsedDates = dateKeys
-      .map((dateKey) => parseCalendarDateKey(dateKey))
-      .filter((date): date is Date => date !== null);
-
-    if (parsedDates.length === dateKeys.length) {
-      const weekdayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "long" });
-      const monthFormatter = new Intl.DateTimeFormat("en-US", { month: "long" });
-      const yearFormatter = new Intl.DateTimeFormat("en-US", { year: "numeric" });
-
-      const firstDate = parsedDates[0];
-      const weekdayName = weekdayFormatter.format(firstDate);
-      const monthName = monthFormatter.format(firstDate);
-      const yearLabel = yearFormatter.format(firstDate);
-      const allSameWeekday = parsedDates.every((date) => weekdayFormatter.format(date) === weekdayName);
-      const allSameMonth = parsedDates.every((date) => monthFormatter.format(date) === monthName);
-      const allSameYear = parsedDates.every((date) => yearFormatter.format(date) === yearLabel);
-
-      if (allSameWeekday && allSameMonth && allSameYear) {
-        return `${dateKeys.length} ${weekdayName}s in ${monthName} ${yearLabel}`;
-      }
-    }
-
-    return formatDateKeyList(dateKeys);
-  }
-
-  function getMealPlannerRelativeLabel(dayOffset: number): string | undefined {
-    if (dayOffset === 0) {
-      return "Today";
-    }
-
-    if (dayOffset === 1) {
-      return "Tomorrow";
-    }
-
-    if (dayOffset === 2) {
-      return "Day after Tomorrow";
-    }
-
-    return undefined;
-  }
 
   /**
    * Exports the current planner state to a JSON file.
@@ -440,68 +346,32 @@ function App() {
 
           {activeTabDefinition.contentKind === "day-planner" ? (
             <section className="flex flex-1 flex-col gap-5">
-              <TimelineTrack
-                title="Today"
-                titleSuffix={formatDashboardWeekdayLabel(todayDateKey)}
-                subtitle={formatDashboardDateSubtitle(todayDateKey)}
-                categories={categories}
-                segments={todaySegments}
-                canPasteTimeline={canPasteTimeline}
-                onMoveSegment={(segmentId, nextStartSlot) => moveSegmentForDate(todayDateKey, segmentId, nextStartSlot)}
-                onResizeSegment={(segmentId, nextStartSlot, nextEndSlot) =>
-                  resizeSegmentForDate(todayDateKey, segmentId, nextStartSlot, nextEndSlot)
-                }
-                draggingCategoryId={draggingCategoryId}
-                onCopyTimeline={() => handleCopyTimeline(todayDateKey)}
-                onPasteTimeline={() => handlePasteTimeline(todayDateKey)}
-                onDropCategory={(categoryId, startSlot, endSlot) =>
-                  handleDropCategory(todayDateKey, categoryId, startSlot, endSlot)
-                }
-                onDeleteSegment={(segmentId) => deleteSegmentForDate(todayDateKey, segmentId)}
-                showCurrentTimeMarker
-              />
-
-              <TimelineTrack
-                title="Tomorrow"
-                titleSuffix={formatDashboardWeekdayLabel(tomorrowDateKey)}
-                subtitle={formatDashboardDateSubtitle(tomorrowDateKey)}
-                categories={categories}
-                segments={tomorrowSegments}
-                canPasteTimeline={canPasteTimeline}
-                onMoveSegment={(segmentId, nextStartSlot) => moveSegmentForDate(tomorrowDateKey, segmentId, nextStartSlot)}
-                onResizeSegment={(segmentId, nextStartSlot, nextEndSlot) =>
-                  resizeSegmentForDate(tomorrowDateKey, segmentId, nextStartSlot, nextEndSlot)
-                }
-                draggingCategoryId={draggingCategoryId}
-                onCopyTimeline={() => handleCopyTimeline(tomorrowDateKey)}
-                onPasteTimeline={() => handlePasteTimeline(tomorrowDateKey)}
-                onDropCategory={(categoryId, startSlot, endSlot) =>
-                  handleDropCategory(tomorrowDateKey, categoryId, startSlot, endSlot)
-                }
-                onDeleteSegment={(segmentId) => deleteSegmentForDate(tomorrowDateKey, segmentId)}
-              />
-
-              <TimelineTrack
-                title="Day after Tomorrow"
-                titleSuffix={formatDashboardWeekdayLabel(dayAfterTomorrowDateKey)}
-                subtitle={formatDashboardDateSubtitle(dayAfterTomorrowDateKey)}
-                categories={categories}
-                segments={dayAfterTomorrowSegments}
-                canPasteTimeline={canPasteTimeline}
-                onMoveSegment={(segmentId, nextStartSlot) =>
-                  moveSegmentForDate(dayAfterTomorrowDateKey, segmentId, nextStartSlot)
-                }
-                onResizeSegment={(segmentId, nextStartSlot, nextEndSlot) =>
-                  resizeSegmentForDate(dayAfterTomorrowDateKey, segmentId, nextStartSlot, nextEndSlot)
-                }
-                draggingCategoryId={draggingCategoryId}
-                onCopyTimeline={() => handleCopyTimeline(dayAfterTomorrowDateKey)}
-                onPasteTimeline={() => handlePasteTimeline(dayAfterTomorrowDateKey)}
-                onDropCategory={(categoryId, startSlot, endSlot) =>
-                  handleDropCategory(dayAfterTomorrowDateKey, categoryId, startSlot, endSlot)
-                }
-                onDeleteSegment={(segmentId) => deleteSegmentForDate(dayAfterTomorrowDateKey, segmentId)}
-              />
+              {DASHBOARD_TIMELINE_ROWS.map((row, index) => {
+                const dateKey = dashboardDateKeys[index];
+                return (
+                  <TimelineTrack
+                    key={dateKey}
+                    title={row.title}
+                    titleSuffix={formatDashboardWeekdayLabel(dateKey)}
+                    subtitle={formatDashboardDateSubtitle(dateKey)}
+                    categories={categories}
+                    segments={segmentsByDate[dateKey] ?? []}
+                    canPasteTimeline={canPasteTimeline}
+                    onMoveSegment={(segmentId, nextStartSlot) => moveSegmentForDate(dateKey, segmentId, nextStartSlot)}
+                    onResizeSegment={(segmentId, nextStartSlot, nextEndSlot) =>
+                      resizeSegmentForDate(dateKey, segmentId, nextStartSlot, nextEndSlot)
+                    }
+                    draggingCategoryId={draggingCategoryId}
+                    onCopyTimeline={() => handleCopyTimeline(dateKey)}
+                    onPasteTimeline={() => handlePasteTimeline(dateKey)}
+                    onDropCategory={(categoryId, startSlot, endSlot) =>
+                      handleDropCategory(dateKey, categoryId, startSlot, endSlot)
+                    }
+                    onDeleteSegment={(segmentId) => deleteSegmentForDate(dateKey, segmentId)}
+                    showCurrentTimeMarker={row.showCurrentTimeMarker}
+                  />
+                );
+              })}
 
               <MonthlyWallCalendar
                 selectedDateKey={selectedDateKey}

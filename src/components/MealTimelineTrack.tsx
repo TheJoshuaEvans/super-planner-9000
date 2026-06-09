@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   formatClockTimeLabel,
   formatHourLabel,
@@ -8,6 +8,8 @@ import {
   quarterHourMarks,
   TOTAL_DAY_SLOTS
 } from "../lib/timeline";
+import { resolveCurrentTimePercent } from "../lib/timelineNow";
+import { useTimelineMarkerClock } from "../hooks/useTimelineMarkerClock";
 import type { PlannerCategory, PlannerSegment } from "../store/plannerStore";
 import Tooltip from "./Tooltip";
 
@@ -21,11 +23,6 @@ type MealTimelineTrackProps = {
   onEatSegmentClick?: (segment: PlannerSegment) => void;
 };
 
-function resolveCurrentTimePercent(currentTime: Date): number {
-  const dayFraction = currentTime.getHours() + currentTime.getMinutes() / 60 + currentTime.getSeconds() / 3600;
-  return Math.max(0, Math.min(100, (dayFraction / 24) * 100));
-}
-
 /**
  * Read-only meal-focused timeline that emphasizes Eat segments.
  */
@@ -38,21 +35,7 @@ function MealTimelineTrack({
   showCurrentTimeMarker = false,
   onEatSegmentClick
 }: MealTimelineTrackProps) {
-  const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
-
-  useEffect(() => {
-    if (!showCurrentTimeMarker) {
-      return;
-    }
-
-    const intervalId = window.setInterval(() => {
-      setCurrentTime(new Date());
-    }, 30_000);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, [showCurrentTimeMarker]);
+  const currentTime = useTimelineMarkerClock({ enabled: showCurrentTimeMarker });
 
   const categoriesById = useMemo(
     () => new Map(categories.map((category) => [category.id, category])),

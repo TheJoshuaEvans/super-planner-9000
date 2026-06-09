@@ -1,6 +1,11 @@
 import { useMemo, useState } from "react";
 import { buildCalendarMonthView, getMonthStart, shiftMonth } from "../lib/calendar";
-import { TOTAL_DAY_SLOTS } from "../lib/timeline";
+import {
+  buildCalendarStatusLabel,
+  buildDateKeysByWeekday,
+  buildSegmentPreviewPercentages,
+  toPreviewFill
+} from "../lib/monthlyCalendarPreview";
 import type { PlannerCategory, PlannerSegmentsByDate } from "../store/plannerStore";
 
 type MonthlyWallCalendarProps = {
@@ -40,12 +45,7 @@ function MonthlyWallCalendar({
   }
 
   const dateKeysByWeekday = useMemo(
-    () => monthView.weekdayLabels.map((_, weekdayIndex) =>
-      monthView.weeks
-        .map((week) => week[weekdayIndex])
-        .filter((cell) => cell.isCurrentMonth)
-        .map((cell) => cell.isoDate)
-    ),
+    () => buildDateKeysByWeekday(monthView),
     [monthView]
   );
 
@@ -53,14 +53,6 @@ function MonthlyWallCalendar({
     () => new Map(categories.map((category) => [category.id, category.color])),
     [categories]
   );
-
-  function toPreviewFill(color: string): string {
-    if (/^#[0-9a-fA-F]{6}$/.test(color)) {
-      return `${color}66`;
-    }
-
-    return color;
-  }
 
   return (
     <section className="rounded-lg border border-app-border bg-app-surface p-4">
@@ -114,9 +106,7 @@ function MonthlyWallCalendar({
             {monthView.weeks.flat().map((cell) => {
               const showPasteButton = cell.isCurrentMonth && onPasteDate !== undefined;
               const previewSegments = cell.isCurrentMonth ? (segmentsByDate[cell.isoDate] ?? []) : [];
-              const statusLabel = previewSegments.length > 0
-                ? "scheduled timeline data present"
-                : "no scheduled timeline data";
+              const statusLabel = buildCalendarStatusLabel(previewSegments.length);
 
               return (
                 <div
@@ -156,16 +146,17 @@ function MonthlyWallCalendar({
                     <span className="absolute inset-x-2 bottom-2 z-10 h-4 overflow-hidden rounded-sm border border-app-border bg-app-panel/45">
                       {previewSegments.map((segment) => {
                         const color = categoryColorById.get(segment.categoryId) ?? "#94a3b8";
-                        const startPercent = Math.max(0, Math.min(100, (segment.startSlot / TOTAL_DAY_SLOTS) * 100));
-                        const endPercent = Math.max(0, Math.min(100, (segment.endSlot / TOTAL_DAY_SLOTS) * 100));
-                        const widthPercent = Math.max(0, endPercent - startPercent);
+                        const { leftPercent, widthPercent } = buildSegmentPreviewPercentages(
+                          segment.startSlot,
+                          segment.endSlot
+                        );
 
                         return (
                           <span
                             key={segment.id}
                             className="absolute inset-y-0"
                             style={{
-                              left: `${startPercent}%`,
+                              left: `${leftPercent}%`,
                               width: `${widthPercent}%`,
                               backgroundColor: toPreviewFill(color)
                             }}
