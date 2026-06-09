@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { applySegmentOverwrite, createSegment, moveSegment, resizeSegment } from "../lib/plannerSegments";
+import { applySegmentOverwrite, createSegment, moveSegment, pasteSegmentsWithOverwrite, resizeSegment } from "../lib/plannerSegments";
 import { TOTAL_DAY_SLOTS } from "../lib/timeline";
 
 /**
@@ -68,6 +68,11 @@ type PlannerStore = PlannerState & {
     * Deletes a segment from the chosen day timeline.
    */
     deleteSegment: (dayKey: PlannerDayKey, segmentId: string) => void;
+
+  /**
+    * Pastes copied segments into the selected day using overwrite merge rules.
+   */
+    pasteSegments: (dayKey: PlannerDayKey, copiedSegments: PlannerSegment[]) => void;
 
   /**
     * Removes all scheduled segments for the chosen day.
@@ -148,6 +153,13 @@ export const usePlannerStore = create<PlannerStore>()(
           segmentsByDay: {
             ...state.segmentsByDay,
             [dayKey]: state.segmentsByDay[dayKey].filter((segment) => segment.id !== segmentId)
+          }
+        })),
+      pasteSegments: (dayKey, copiedSegments) =>
+        set((state) => ({
+          segmentsByDay: {
+            ...state.segmentsByDay,
+            [dayKey]: pasteSegmentsWithOverwrite(state.segmentsByDay[dayKey], copiedSegments)
           }
         })),
       clearSegments: (dayKey) =>

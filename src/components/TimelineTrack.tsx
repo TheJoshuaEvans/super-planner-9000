@@ -18,10 +18,13 @@ type TimelineTrackProps = {
   title: string;
   categories: PlannerCategory[];
   segments: PlannerSegment[];
+  canPasteTimeline: boolean;
   draggingCategoryId: string | null;
   onMoveSegment: (segmentId: string, nextStartSlot: number) => void;
   onResizeSegment: (segmentId: string, nextStartSlot: number, nextEndSlot: number) => void;
   onDropCategory: (categoryId: string, startSlot: number, endSlot: number) => void;
+  onCopyTimeline: () => void;
+  onPasteTimeline: () => void;
   onDeleteSegment: (segmentId: string) => void;
   footer?: ReactNode;
   showCurrentTimeMarker?: boolean;
@@ -105,10 +108,13 @@ function TimelineTrack({
   title,
   categories,
   segments,
+  canPasteTimeline,
   draggingCategoryId,
   onMoveSegment,
   onResizeSegment,
   onDropCategory,
+  onCopyTimeline,
+  onPasteTimeline,
   onDeleteSegment,
   footer,
   showCurrentTimeMarker = false
@@ -288,24 +294,48 @@ function TimelineTrack({
           <h2 className="text-lg font-semibold">{title}</h2>
           <p className="text-sm text-app-muted">0-24 timeline at 15-minute resolution</p>
         </div>
-        <div
-          ref={trashRef}
-          className={`pointer-events-none flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium uppercase tracking-wide transition ${
-            isTrashHot
-              ? "border-red-400/80 bg-red-500/20 text-red-200"
-              : "border-app-border bg-app-panel text-app-muted"
-          }`}
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9">
-            <path d="M4 7h16" strokeLinecap="round" />
-            <path d="M9 7V5.5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5.5V7" strokeLinecap="round" />
-            <path d="M7.5 7l.7 11a2 2 0 0 0 2 1.9h3.6a2 2 0 0 0 2-1.9l.7-11" strokeLinecap="round" />
-            <path d="M10 11v5M14 11v5" strokeLinecap="round" />
-          </svg>
-          <span className="relative inline-block w-[8.75rem] text-left">
-            <span className={`transition-opacity ${isTrashHot ? "opacity-0" : "opacity-100"}`}>Drag here to delete</span>
-            <span className={`absolute inset-0 transition-opacity ${isTrashHot ? "opacity-100" : "opacity-0"}`}>Release to delete</span>
-          </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="rounded-md border border-app-border bg-app-panel px-3 py-2 text-xs font-medium uppercase tracking-wide text-app-muted transition hover:border-app-accent/70 hover:text-app-text"
+            onClick={onCopyTimeline}
+          >
+            Copy
+          </button>
+
+          <button
+            type="button"
+            className={`rounded-md border px-3 py-2 text-xs font-medium uppercase tracking-wide transition ${
+              canPasteTimeline
+                ? "border-app-border bg-app-panel text-app-muted hover:border-app-accent/70 hover:text-app-text"
+                : "cursor-not-allowed border-app-bg bg-app-bg text-app-muted"
+            }`}
+            onClick={onPasteTimeline}
+            disabled={!canPasteTimeline}
+            aria-disabled={!canPasteTimeline}
+          >
+            Paste
+          </button>
+
+          <div
+            ref={trashRef}
+            className={`pointer-events-none flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium uppercase tracking-wide transition ${
+              isTrashHot
+                ? "border-red-400/80 bg-red-500/20 text-red-200"
+                : "border-app-border bg-app-panel text-app-muted"
+            }`}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9">
+              <path d="M4 7h16" strokeLinecap="round" />
+              <path d="M9 7V5.5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5.5V7" strokeLinecap="round" />
+              <path d="M7.5 7l.7 11a2 2 0 0 0 2 1.9h3.6a2 2 0 0 0 2-1.9l.7-11" strokeLinecap="round" />
+              <path d="M10 11v5M14 11v5" strokeLinecap="round" />
+            </svg>
+            <span className="relative inline-block w-[8.75rem] text-left">
+              <span className={`transition-opacity ${isTrashHot ? "opacity-0" : "opacity-100"}`}>Drag here to delete</span>
+              <span className={`absolute inset-0 transition-opacity ${isTrashHot ? "opacity-100" : "opacity-0"}`}>Release to delete</span>
+            </span>
+          </div>
         </div>
       </div>
 

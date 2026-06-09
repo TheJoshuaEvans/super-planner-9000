@@ -2,6 +2,7 @@ import CategoryPalette from "./components/CategoryPalette";
 import TimelineTrack from "./components/TimelineTrack";
 import { usePlannerStore } from "./store/plannerStore";
 import { useState } from "react";
+import type { PlannerDayKey, PlannerSegment } from "./store/plannerStore";
 
 /**
  * Composes the planner page shell from the timeline track and category palette.
@@ -13,9 +14,12 @@ function App() {
   const moveSegment = usePlannerStore((state) => state.moveSegment);
   const resizeSegment = usePlannerStore((state) => state.resizeSegment);
   const deleteSegment = usePlannerStore((state) => state.deleteSegment);
+  const pasteSegments = usePlannerStore((state) => state.pasteSegments);
   const totalScheduledBlocks = segmentsByDay.today.length + segmentsByDay.tomorrow.length;
 
   const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
+  const [copiedTimelineSegments, setCopiedTimelineSegments] = useState<PlannerSegment[] | null>(null);
+  const canPasteTimeline = copiedTimelineSegments !== null;
 
   /**
    * Commits a dragged category onto the timeline at the given slot range.
@@ -28,6 +32,24 @@ function App() {
   ): void {
     addCategory(dayKey, categoryId, startSlot, endSlot);
     setDraggingCategoryId(null);
+  }
+
+  /**
+   * Copies a timeline's current segment configuration into session clipboard state.
+   */
+  function handleCopyTimeline(dayKey: PlannerDayKey): void {
+    setCopiedTimelineSegments(segmentsByDay[dayKey].map((segment) => ({ ...segment })));
+  }
+
+  /**
+   * Pastes copied segments into a target timeline using merge-overwrite semantics.
+   */
+  function handlePasteTimeline(dayKey: PlannerDayKey): void {
+    if (!copiedTimelineSegments) {
+      return;
+    }
+
+    pasteSegments(dayKey, copiedTimelineSegments);
   }
 
   return (
@@ -64,11 +86,14 @@ function App() {
             title="Today"
             categories={categories}
             segments={segmentsByDay.today}
+            canPasteTimeline={canPasteTimeline}
             onMoveSegment={(segmentId, nextStartSlot) => moveSegment("today", segmentId, nextStartSlot)}
             onResizeSegment={(segmentId, nextStartSlot, nextEndSlot) =>
               resizeSegment("today", segmentId, nextStartSlot, nextEndSlot)
             }
             draggingCategoryId={draggingCategoryId}
+            onCopyTimeline={() => handleCopyTimeline("today")}
+            onPasteTimeline={() => handlePasteTimeline("today")}
             onDropCategory={(categoryId, startSlot, endSlot) =>
               handleDropCategory("today", categoryId, startSlot, endSlot)
             }
@@ -80,11 +105,14 @@ function App() {
             title="Tomorrow"
             categories={categories}
             segments={segmentsByDay.tomorrow}
+            canPasteTimeline={canPasteTimeline}
             onMoveSegment={(segmentId, nextStartSlot) => moveSegment("tomorrow", segmentId, nextStartSlot)}
             onResizeSegment={(segmentId, nextStartSlot, nextEndSlot) =>
               resizeSegment("tomorrow", segmentId, nextStartSlot, nextEndSlot)
             }
             draggingCategoryId={draggingCategoryId}
+            onCopyTimeline={() => handleCopyTimeline("tomorrow")}
+            onPasteTimeline={() => handlePasteTimeline("tomorrow")}
             onDropCategory={(categoryId, startSlot, endSlot) =>
               handleDropCategory("tomorrow", categoryId, startSlot, endSlot)
             }

@@ -3,8 +3,8 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  // Relative base keeps static builds portable (for GitHub Pages and similar hosts).
-  base: "./",
+  // Base path for GitHub Pages deployment.
+  base: "/super-planner-9000/",
   test: {
     environment: "node",
     setupFiles: ["./src/test/setup.ts"],

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applySegmentOverwrite, createSegment, moveSegment, resizeSegment } from "./plannerSegments";
+import { applySegmentOverwrite, createSegment, moveSegment, pasteSegmentsWithOverwrite, resizeSegment } from "./plannerSegments";
 
 describe("plannerSegments", () => {
   it("creates a segment with expected fields", () => {
@@ -105,5 +105,36 @@ describe("plannerSegments", () => {
     expect(updated).toHaveLength(2);
     expect(updated[0]).toMatchObject({ id: "a", startSlot: 4, endSlot: 10 });
     expect(updated[1]).toMatchObject({ categoryId: "sleep", startSlot: 10, endSlot: 12 });
+  });
+
+  it("pastes copied segments into a timeline using overwrite semantics", () => {
+    const updated = pasteSegmentsWithOverwrite(
+      [
+        { id: "a", categoryId: "sleep", startSlot: 0, endSlot: 8 },
+        { id: "b", categoryId: "eat", startSlot: 16, endSlot: 20 }
+      ],
+      [
+        { id: "copy-1", categoryId: "work", startSlot: 4, endSlot: 12 },
+        { id: "copy-2", categoryId: "travel", startSlot: 12, endSlot: 18 }
+      ]
+    );
+
+    expect(updated).toHaveLength(4);
+    expect(updated[0]).toMatchObject({ categoryId: "sleep", startSlot: 0, endSlot: 4 });
+    expect(updated[1]).toMatchObject({ categoryId: "work", startSlot: 4, endSlot: 12 });
+    expect(updated[2]).toMatchObject({ categoryId: "travel", startSlot: 12, endSlot: 18 });
+    expect(updated[3]).toMatchObject({ categoryId: "eat", startSlot: 18, endSlot: 20 });
+  });
+
+  it("creates fresh ids for pasted segments", () => {
+    const copied = [
+      { id: "copy-1", categoryId: "work", startSlot: 4, endSlot: 8 }
+    ];
+
+    const updated = pasteSegmentsWithOverwrite([], copied);
+
+    expect(updated).toHaveLength(1);
+    expect(updated[0].id).not.toBe("copy-1");
+    expect(updated[0].id.startsWith("segment-")).toBe(true);
   });
 });

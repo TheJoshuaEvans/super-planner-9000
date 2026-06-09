@@ -66,6 +66,31 @@ export function createSegment(categoryId: string, startSlot: number, endSlot: nu
     endSlot
   };
 }
+
+/**
+ * Merges copied segments into an existing timeline using overwrite semantics.
+ * Incoming segments are normalized and recreated with fresh ids.
+ */
+export function pasteSegmentsWithOverwrite(
+  existingSegments: PlannerSegment[],
+  copiedSegments: PlannerSegment[]
+): PlannerSegment[] {
+  const normalizedCopied = copiedSegments
+    .map((segment) => ({
+      categoryId: segment.categoryId,
+      startSlot: clampSlot(segment.startSlot),
+      endSlot: clampSlot(segment.endSlot)
+    }))
+    .filter((segment) => segment.endSlot > segment.startSlot)
+    .sort((left, right) => left.startSlot - right.startSlot);
+
+  return normalizedCopied.reduce(
+    (segments, segment) =>
+      applySegmentOverwrite(segments, createSegment(segment.categoryId, segment.startSlot, segment.endSlot)),
+    existingSegments
+  );
+}
+
 /**
  * Resizes an existing segment to a new slot range, clamping to day bounds and
  * enforcing a minimum duration of one slot. Overwrites any newly overlapping segments.

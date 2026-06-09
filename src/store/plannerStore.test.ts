@@ -133,4 +133,41 @@ describe("plannerStore", () => {
     expect(state.segmentsByDay.tomorrow).toHaveLength(1);
     expect(state.segmentsByDay.tomorrow[0]).toMatchObject({ categoryId: "play", startSlot: 8, endSlot: 12 });
   });
+
+  it("pastes copied segments into a target day using overwrite merge", () => {
+    const store = usePlannerStore.getState();
+    store.setSegments("today", [
+      { id: "a", categoryId: "sleep", startSlot: 0, endSlot: 8 }
+    ]);
+
+    store.pasteSegments("today", [
+      { id: "copy-a", categoryId: "work", startSlot: 4, endSlot: 12 }
+    ]);
+
+    const today = usePlannerStore.getState().segmentsByDay.today;
+    expect(today).toHaveLength(2);
+    expect(today[0]).toMatchObject({ categoryId: "sleep", startSlot: 0, endSlot: 4 });
+    expect(today[1]).toMatchObject({ categoryId: "work", startSlot: 4, endSlot: 12 });
+    expect(today[1].id).not.toBe("copy-a");
+  });
+
+  it("pastes into one day without mutating the other", () => {
+    const store = usePlannerStore.getState();
+    store.setSegments("today", [{ id: "today-a", categoryId: "sleep", startSlot: 0, endSlot: 8 }]);
+    store.setSegments("tomorrow", [{ id: "tomorrow-a", categoryId: "play", startSlot: 8, endSlot: 12 }]);
+
+    store.pasteSegments("tomorrow", [
+      { id: "copy-a", categoryId: "work", startSlot: 0, endSlot: 4 }
+    ]);
+
+    const state = usePlannerStore.getState();
+    expect(state.segmentsByDay.today).toHaveLength(1);
+    expect(state.segmentsByDay.today[0]).toMatchObject({ id: "today-a" });
+    expect(state.segmentsByDay.tomorrow).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ categoryId: "work", startSlot: 0, endSlot: 4 }),
+        expect.objectContaining({ id: "tomorrow-a", categoryId: "play", startSlot: 8, endSlot: 12 })
+      ])
+    );
+  });
 });
