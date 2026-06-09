@@ -1,9 +1,11 @@
 import CategoryPalette from "./components/CategoryPalette";
 import MealTimelineTrack from "./components/MealTimelineTrack";
 import MonthlyWallCalendar from "./components/MonthlyWallCalendar";
+import PlannerHistoryControls from "./components/PlannerHistoryControls";
 import PortraitWarningOverlay from "./components/PortraitWarningOverlay";
 import ToastViewport from "./components/ToastViewport";
 import TimelineTrack from "./components/TimelineTrack";
+import { usePlannerUndoRedoHotkeys } from "./hooks/usePlannerUndoRedoHotkeys";
 import { formatCalendarDateLabel, getRelativeCalendarDateKey, parseCalendarDateKey } from "./lib/calendar";
 import {
   buildPlannerExportFilename,
@@ -34,6 +36,13 @@ const APP_TABS = [
     kicker: "Meal Planner",
     description: "Review your day through a meal-planning lens, with food blocks emphasized and everything else subdued.",
     contentKind: "meal-planner"
+  },
+  {
+    id: "meal-generator",
+    label: "Meal Generator",
+    kicker: "Meal Generator",
+    description: "Stub page for upcoming meal generation workflows.",
+    contentKind: "placeholder"
   }
 ] as const;
 
@@ -60,6 +69,10 @@ function App() {
   const resizeSegmentForDate = usePlannerStore((state) => state.resizeSegmentForDate);
   const deleteSegmentForDate = usePlannerStore((state) => state.deleteSegmentForDate);
   const pasteSegmentsForDate = usePlannerStore((state) => state.pasteSegmentsForDate);
+  const canUndoPlannerEdit = usePlannerStore((state) => state.canUndo);
+  const canRedoPlannerEdit = usePlannerStore((state) => state.canRedo);
+  const undoPlannerEdit = usePlannerStore((state) => state.undoPlannerEdit);
+  const redoPlannerEdit = usePlannerStore((state) => state.redoPlannerEdit);
   const showToast = useToastStore((state) => state.showToast);
   const [activeTab, setActiveTab] = useState<AppTab>(() => {
     if (typeof window === "undefined") {
@@ -99,6 +112,14 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(ACTIVE_TAB_LOCAL_STORAGE_KEY, activeTab);
   }, [activeTab]);
+
+  usePlannerUndoRedoHotkeys({
+    enabled: isDayPlannerTab,
+    canUndo: canUndoPlannerEdit,
+    canRedo: canRedoPlannerEdit,
+    onUndo: undoPlannerEdit,
+    onRedo: redoPlannerEdit
+  });
 
   function formatDateKeyList(dateKeys: PlannerDateKey[]): string {
     return dateKeys.map((dateKey) => formatCalendarDateLabel(dateKey)).join(", ");
@@ -492,7 +513,7 @@ function App() {
                 segmentsByDate={segmentsByDate}
               />
             </section>
-          ) : (
+          ) : activeTabDefinition.contentKind === "meal-planner" ? (
             <section className="flex flex-1 flex-col gap-5">
               {mealPlannerWeekDateKeys.map((dateKey, dayOffset) => (
                 <MealTimelineTrack
@@ -507,12 +528,29 @@ function App() {
                 />
               ))}
             </section>
+          ) : (
+            <section className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-app-border bg-app-surface/70 px-6 py-16 text-center">
+              <div className="max-w-md space-y-3">
+                <p className="text-sm font-medium uppercase tracking-[0.24em] text-app-muted">{activeTabDefinition.kicker}</p>
+                <h2 className="text-2xl font-semibold tracking-tight">Coming soon</h2>
+                <p className="text-sm text-app-muted sm:text-base">{activeTabDefinition.description}</p>
+              </div>
+            </section>
           )}
         </section>
 
         {isDayPlannerTab ? (
           <section className="fixed inset-x-0 bottom-0 z-50 px-4 pb-4 lg:px-6 lg:pb-5">
             <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-4 rounded-lg border border-app-border bg-app-surface/95 p-4 shadow-card backdrop-blur">
+              <div className="flex items-center justify-end">
+                <PlannerHistoryControls
+                  canUndo={canUndoPlannerEdit}
+                  canRedo={canRedoPlannerEdit}
+                  onUndo={undoPlannerEdit}
+                  onRedo={redoPlannerEdit}
+                />
+              </div>
+
               {selectedDateKey ? (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">

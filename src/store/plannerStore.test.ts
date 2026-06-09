@@ -190,4 +190,72 @@ describe("plannerStore", () => {
       ])
     );
   });
+
+  it("tracks undo and redo flags after timeline edits", () => {
+    const store = usePlannerStore.getState();
+
+    expect(store.canUndo).toBe(false);
+    expect(store.canRedo).toBe(false);
+
+    store.addCategoryForDate(DATE_A, "work", 0, 4);
+
+    expect(usePlannerStore.getState().canUndo).toBe(true);
+    expect(usePlannerStore.getState().canRedo).toBe(false);
+
+    store.undoPlannerEdit();
+
+    expect(usePlannerStore.getState().segmentsByDate[DATE_A]).toEqual(undefined);
+    expect(usePlannerStore.getState().canUndo).toBe(false);
+    expect(usePlannerStore.getState().canRedo).toBe(true);
+
+    store.redoPlannerEdit();
+
+    expect(usePlannerStore.getState().segmentsByDate[DATE_A]).toHaveLength(1);
+    expect(usePlannerStore.getState().canUndo).toBe(true);
+    expect(usePlannerStore.getState().canRedo).toBe(false);
+  });
+
+  it("clears redo history when a new edit happens after undo", () => {
+    const store = usePlannerStore.getState();
+
+    store.addCategoryForDate(DATE_A, "work", 0, 4);
+    store.addCategoryForDate(DATE_A, "eat", 8, 12);
+    store.undoPlannerEdit();
+
+    expect(usePlannerStore.getState().canRedo).toBe(true);
+
+    store.addCategoryForDate(DATE_A, "play", 16, 20);
+
+    expect(usePlannerStore.getState().canRedo).toBe(false);
+  });
+
+  it("does not create history entries for no-op invalid range edits", () => {
+    const store = usePlannerStore.getState();
+
+    store.addCategoryForDate(DATE_A, "work", 10, 10);
+
+    expect(usePlannerStore.getState().canUndo).toBe(false);
+    expect(usePlannerStore.getState().canRedo).toBe(false);
+  });
+
+  it("rebases and clears history on replacePlannerData", () => {
+    const store = usePlannerStore.getState();
+
+    store.addCategoryForDate(DATE_A, "work", 0, 4);
+    expect(usePlannerStore.getState().canUndo).toBe(true);
+
+    store.replacePlannerData({
+      categories: [{ id: "custom", label: "Custom", color: "#111111" }],
+      segmentsByDate: {
+        [DATE_B]: [{ id: "custom-1", categoryId: "custom", startSlot: 12, endSlot: 16 }]
+      }
+    });
+
+    const state = usePlannerStore.getState();
+
+    expect(state.canUndo).toBe(false);
+    expect(state.canRedo).toBe(false);
+    expect(state.categories).toEqual([{ id: "custom", label: "Custom", color: "#111111" }]);
+    expect(state.segmentsByDate[DATE_B]).toHaveLength(1);
+  });
 });
