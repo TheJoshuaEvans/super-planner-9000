@@ -53,6 +53,11 @@ function MealsPanel() {
   const formIngredients = useMealCreatorFormStore((s) => s.mealFormIngredients);
   const setForm = useMealCreatorFormStore((s) => s.setMealForm);
 
+  const sortedMeals = useMemo(
+    () => [...meals].sort((a, b) => a.name.localeCompare(b.name)),
+    [meals]
+  );
+
   const componentsById = useMemo(
     () => new Map(components.map((c) => [c.id, c])),
     [components]
@@ -264,7 +269,7 @@ function MealsPanel() {
         </p>
       ) : (
         <ul className="space-y-2">
-          {meals.map((meal) => {
+          {sortedMeals.map((meal) => {
             const isBeingEdited = mode === "edit" && editingId === meal.id;
             return (
               <li
