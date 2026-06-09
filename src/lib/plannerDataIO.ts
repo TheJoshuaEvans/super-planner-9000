@@ -1,18 +1,20 @@
 import { TOTAL_DAY_SLOTS } from "./timeline";
 import type { PlannerCategory, PlannerPersistedData, PlannerSegment, PlannerSegmentsByDate } from "../store/plannerStore";
+import type { Meal, MealComponent, MealIngredient, MealPersistedData } from "../store/mealStore.types";
 
 export const PLANNER_DATA_EXPORT_APP = "super-planner-9000" as const;
-export const PLANNER_DATA_EXPORT_VERSION = 1 as const;
+export const PLANNER_DATA_EXPORT_VERSION = 2 as const;
 
 export type PlannerDataExportEnvelope = {
   app: typeof PLANNER_DATA_EXPORT_APP;
   version: typeof PLANNER_DATA_EXPORT_VERSION;
   exportedAt: string;
   data: PlannerPersistedData;
+  meals: MealPersistedData;
 };
 
 export type PlannerDataImportResult =
-  | { ok: true; data: PlannerPersistedData }
+  | { ok: true; data: PlannerPersistedData; meals: MealPersistedData }
   | { ok: false; error: string };
 
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -113,7 +115,60 @@ function isPlannerPersistedData(value: unknown): value is PlannerPersistedData {
 }
 
 /**
- * Produces a deep-cloned, JSON-safe persisted payload.
+ * Validates a single meal component shape.
+ *
+ * @param value - Unknown candidate component.
+ * @returns Whether the value matches MealComponent fields.
+ */
+function isMealComponent(value: unknown): value is MealComponent {
+  return isPlainObject(value) && isString(value.id) && isString(value.name);
+}
+
+/**
+ * Validates a single meal ingredient shape.
+ *
+ * @param value - Unknown candidate ingredient.
+ * @returns Whether the value matches MealIngredient fields.
+ */
+function isMealIngredient(value: unknown): value is MealIngredient {
+  return isPlainObject(value) && isString(value.componentId) && isString(value.quantity);
+}
+
+/**
+ * Validates a single meal shape.
+ *
+ * @param value - Unknown candidate meal.
+ * @returns Whether the value matches Meal fields.
+ */
+function isMeal(value: unknown): value is Meal {
+  return (
+    isPlainObject(value) &&
+    isString(value.id) &&
+    isString(value.name) &&
+    isString(value.description) &&
+    Array.isArray(value.ingredients) &&
+    value.ingredients.every((ingredient) => isMealIngredient(ingredient))
+  );
+}
+
+/**
+ * Validates the persisted meal store payload shape.
+ *
+ * @param value - Unknown candidate meal store data.
+ * @returns Whether components and meals arrays are valid.
+ */
+function isMealPersistedData(value: unknown): value is MealPersistedData {
+  return (
+    isPlainObject(value) &&
+    Array.isArray(value.components) &&
+    value.components.every((component) => isMealComponent(component)) &&
+    Array.isArray(value.meals) &&
+    value.meals.every((meal) => isMeal(meal))
+  );
+}
+
+/**
+ * Produces a deep-cloned, JSON-safe persisted planner payload.
  *
  * @param data - Persisted planner data to normalize.
  * @returns Cloned payload suitable for export.
@@ -140,30 +195,55 @@ function normalizePlannerPersistedData(data: PlannerPersistedData): PlannerPersi
 }
 
 /**
- * Creates a versioned export envelope for the current planner data.
+ * Produces a deep-cloned, JSON-safe persisted meal payload.
+ *
+ * @param meals - Persisted meal data to normalize.
+ * @returns Cloned payload suitable for export.
  */
-export function createPlannerDataExportEnvelope(
-  data: PlannerPersistedData,
-  exportedAt: Date = new Date()
-): PlannerDataExportEnvelope {
-  const normalizedData = normalizePlannerPersistedData(data);
-
+function normalizeMealPersistedData(meals: MealPersistedData): MealPersistedData {
   return {
-    app: PLANNER_DATA_EXPORT_APP,
-    version: PLANNER_DATA_EXPORT_VERSION,
-    exportedAt: exportedAt.toISOString(),
-    data: normalizedData
+    components: meals.components.map((component) => ({
+      id: component.id,
+      name: component.name
+    })),
+    meals: meals.meals.map((meal) => ({
+      id: meal.id,
+      name: meal.name,
+      description: meal.description,
+      ingredients: meal.ingredients.map((ingredient) => ({
+        componentId: ingredient.componentId,
+        quantity: ingredient.quantity
+      }))
+    }))
   };
 }
 
 /**
- * Serializes planner data into a formatted JSON export string.
+ * Creates a versioned export envelope for the current planner and meal data.
+ */
+export function createPlannerDataExportEnvelope(
+  plannerData: PlannerPersistedData,
+  mealData: MealPersistedData,
+  exportedAt: Date = new Date()
+): PlannerDataExportEnvelope {
+  return {
+    app: PLANNER_DATA_EXPORT_APP,
+    version: PLANNER_DATA_EXPORT_VERSION,
+    exportedAt: exportedAt.toISOString(),
+    data: normalizePlannerPersistedData(plannerData),
+    meals: normalizeMealPersistedData(mealData)
+  };
+}
+
+/**
+ * Serializes planner and meal data into a formatted JSON export string.
  */
 export function serializePlannerDataExport(
-  data: PlannerPersistedData,
+  plannerData: PlannerPersistedData,
+  mealData: MealPersistedData,
   exportedAt: Date = new Date()
 ): string {
-  return JSON.stringify(createPlannerDataExportEnvelope(data, exportedAt), null, 2);
+  return JSON.stringify(createPlannerDataExportEnvelope(plannerData, mealData, exportedAt), null, 2);
 }
 
 /**
@@ -206,5 +286,9 @@ export function parsePlannerDataImport(text: string): PlannerDataImportResult {
     return { ok: false, error: "Import file does not contain valid planner data." };
   }
 
-  return { ok: true, data: parsed.data };
+  if (!isMealPersistedData(parsed.meals)) {
+    return { ok: false, error: "Import file does not contain valid meal data." };
+  }
+
+  return { ok: true, data: parsed.data, meals: parsed.meals };
 }

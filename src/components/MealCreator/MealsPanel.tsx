@@ -1,10 +1,7 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, type FormEvent } from "react";
+import { useMealCreatorFormStore } from "../../store/mealCreatorFormStore";
 import { useMealStore } from "../../store/mealStore";
 import type { Meal, MealIngredient } from "../../store/mealStore";
-
-type PanelMode = "list" | "add" | "edit";
-
-type IngredientRow = { componentId: string; quantity: string };
 
 const inputClassName =
   "w-full rounded-md border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text placeholder:text-app-muted/60 focus:border-app-accent/60 focus:outline-none focus:ring-2 focus:ring-app-accent/20";
@@ -49,10 +46,12 @@ function MealsPanel() {
   const updateMeal = useMealStore((state) => state.updateMeal);
   const deleteMeal = useMealStore((state) => state.deleteMeal);
 
-  const [mode, setMode] = useState<PanelMode>("list");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [formName, setFormName] = useState("");
-  const [formIngredients, setFormIngredients] = useState<IngredientRow[]>([]);
+  const mode = useMealCreatorFormStore((s) => s.mealMode);
+  const editingId = useMealCreatorFormStore((s) => s.mealEditingId);
+  const formName = useMealCreatorFormStore((s) => s.mealFormName);
+  const formDescription = useMealCreatorFormStore((s) => s.mealFormDescription);
+  const formIngredients = useMealCreatorFormStore((s) => s.mealFormIngredients);
+  const setForm = useMealCreatorFormStore((s) => s.setMealForm);
 
   const componentsById = useMemo(
     () => new Map(components.map((c) => [c.id, c])),
@@ -65,10 +64,13 @@ function MealsPanel() {
    * Opens the add form with an empty state.
    */
   function handleStartAdd(): void {
-    setMode("add");
-    setEditingId(null);
-    setFormName("");
-    setFormIngredients([]);
+    setForm({
+      mealMode: "add",
+      mealEditingId: null,
+      mealFormName: "",
+      mealFormDescription: "",
+      mealFormIngredients: [],
+    });
   }
 
   /**
@@ -77,27 +79,33 @@ function MealsPanel() {
    * @param meal - The meal to edit.
    */
   function handleStartEdit(meal: Meal): void {
-    setMode("edit");
-    setEditingId(meal.id);
-    setFormName(meal.name);
-    setFormIngredients(meal.ingredients.map((i) => ({ ...i })));
+    setForm({
+      mealMode: "edit",
+      mealEditingId: meal.id,
+      mealFormName: meal.name,
+      mealFormDescription: meal.description,
+      mealFormIngredients: meal.ingredients.map((i) => ({ ...i })),
+    });
   }
 
   /**
    * Discards the active form and returns to list mode.
    */
   function handleCancel(): void {
-    setMode("list");
-    setEditingId(null);
-    setFormName("");
-    setFormIngredients([]);
+    setForm({
+      mealMode: "list",
+      mealEditingId: null,
+      mealFormName: "",
+      mealFormDescription: "",
+      mealFormIngredients: [],
+    });
   }
 
   /**
    * Appends a blank ingredient row to the form.
    */
   function handleAddIngredientRow(): void {
-    setFormIngredients((prev) => [...prev, { componentId: "", quantity: "" }]);
+    setForm({ mealFormIngredients: [...formIngredients, { componentId: "", quantity: "" }] });
   }
 
   /**
@@ -107,10 +115,16 @@ function MealsPanel() {
    * @param field - Field name to update.
    * @param value - New field value.
    */
-  function handleIngredientChange(index: number, field: keyof IngredientRow, value: string): void {
-    setFormIngredients((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, [field]: value } : row))
-    );
+  function handleIngredientChange(
+    index: number,
+    field: "componentId" | "quantity",
+    value: string
+  ): void {
+    setForm({
+      mealFormIngredients: formIngredients.map((row, i) =>
+        i === index ? { ...row, [field]: value } : row
+      ),
+    });
   }
 
   /**
@@ -119,7 +133,7 @@ function MealsPanel() {
    * @param index - Row index to remove.
    */
   function handleRemoveIngredient(index: number): void {
-    setFormIngredients((prev) => prev.filter((_, i) => i !== index));
+    setForm({ mealFormIngredients: formIngredients.filter((_, i) => i !== index) });
   }
 
   /**
@@ -134,9 +148,9 @@ function MealsPanel() {
       .filter((row) => row.componentId !== "")
       .map(({ componentId, quantity }) => ({ componentId, quantity }));
     if (mode === "add") {
-      addMeal(formName, ingredients);
+      addMeal(formName, formDescription, ingredients);
     } else if (mode === "edit" && editingId) {
-      updateMeal(editingId, formName, ingredients);
+      updateMeal(editingId, formName, formDescription, ingredients);
     }
     handleCancel();
   }
@@ -165,8 +179,16 @@ function MealsPanel() {
             type="text"
             placeholder="Meal name"
             value={formName}
-            onChange={(e) => setFormName(e.target.value)}
+            onChange={(e) => setForm({ mealFormName: e.target.value })}
             autoFocus
+            className={inputClassName}
+          />
+
+          <input
+            type="text"
+            placeholder="Description (optional)"
+            value={formDescription}
+            onChange={(e) => setForm({ mealFormDescription: e.target.value })}
             className={inputClassName}
           />
 
@@ -255,7 +277,10 @@ function MealsPanel() {
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-app-text">{meal.name}</p>
-                  <p className="truncate text-xs text-app-muted">
+                  {meal.description && (
+                    <p className="truncate text-xs text-app-muted">{meal.description}</p>
+                  )}
+                  <p className="truncate text-xs text-app-muted/70">
                     {formatIngredientSummary(meal, componentsById)}
                   </p>
                 </div>

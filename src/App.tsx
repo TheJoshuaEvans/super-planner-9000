@@ -28,6 +28,7 @@ import {
 } from "./lib/plannerViewHelpers";
 import { formatSlotRangeLabelMeridiem } from "./lib/timeline";
 import { usePlannerStore } from "./store/plannerStore";
+import { useMealStore } from "./store/mealStore";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useToastStore } from "./store/toastStore";
 import type { PlannerDateKey, PlannerSegment } from "./store/plannerStore";
@@ -109,10 +110,11 @@ function App() {
    */
   function handleExportPlannerData(): void {
     const plannerState = usePlannerStore.getState();
-    const exportedJson = serializePlannerDataExport({
-      categories: plannerState.categories,
-      segmentsByDate: plannerState.segmentsByDate
-    });
+    const mealState = useMealStore.getState();
+    const exportedJson = serializePlannerDataExport(
+      { categories: plannerState.categories, segmentsByDate: plannerState.segmentsByDate },
+      { components: mealState.components, meals: mealState.meals }
+    );
     const blob = new Blob([exportedJson], { type: "application/json;charset=utf-8" });
     const downloadUrl = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -163,6 +165,7 @@ function App() {
       }
 
       replacePlannerData(parsed.data);
+      useMealStore.getState().replaceMealData(parsed.meals);
       setSelectedDateKey(null);
       setCopiedTimelineSegments(null);
       setCopiedTimelineSourceDateKey(null);

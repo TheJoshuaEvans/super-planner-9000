@@ -4,7 +4,6 @@
 export type MealComponent = {
   id: string;
   name: string;
-  description: string;
 };
 
 /**
@@ -21,6 +20,7 @@ export type MealIngredient = {
 export type Meal = {
   id: string;
   name: string;
+  description: string;
   ingredients: MealIngredient[];
 };
 
@@ -37,17 +37,19 @@ export type MealPersistedData = {
  */
 export type MealStore = MealPersistedData & {
   /** Adds a new component to the library. */
-  addComponent: (name: string, description: string) => void;
-  /** Updates the name and description of an existing component by id. */
-  updateComponent: (id: string, name: string, description: string) => void;
+  addComponent: (name: string) => void;
+  /** Updates the name of an existing component by id. */
+  updateComponent: (id: string, name: string) => void;
   /** Removes a component and strips it from all meal ingredient lists. */
   deleteComponent: (id: string) => void;
   /** Adds a new meal to the library. */
-  addMeal: (name: string, ingredients: MealIngredient[]) => void;
-  /** Updates the name and ingredients of an existing meal by id. */
-  updateMeal: (id: string, name: string, ingredients: MealIngredient[]) => void;
+  addMeal: (name: string, description: string, ingredients: MealIngredient[]) => void;
+  /** Updates the name, description, and ingredients of an existing meal by id. */
+  updateMeal: (id: string, name: string, description: string, ingredients: MealIngredient[]) => void;
   /** Removes a meal from the library. */
   deleteMeal: (id: string) => void;
+  /** Replaces the entire persisted state (used by data import). */
+  replaceMealData: (data: MealPersistedData) => void;
   /** Resets the store to an empty state. */
   resetMealStore: () => void;
 };

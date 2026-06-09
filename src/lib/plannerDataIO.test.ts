@@ -8,7 +8,7 @@ import {
   PLANNER_DATA_EXPORT_VERSION
 } from "./plannerDataIO";
 
-const sampleData = {
+const samplePlannerData = {
   categories: [
     { id: "work", label: "Work", color: "#0f766e" }
   ],
@@ -19,42 +19,59 @@ const sampleData = {
   }
 };
 
+const sampleMealData = {
+  components: [
+    { id: "component-1", name: "Chicken" }
+  ],
+  meals: [
+    {
+      id: "meal-1",
+      name: "Grilled Chicken",
+      description: "Simple and healthy",
+      ingredients: [{ componentId: "component-1", quantity: "200g" }]
+    }
+  ]
+};
+
 describe("plannerDataIO", () => {
   it("creates a versioned export envelope", () => {
     const exportedAt = new Date("2026-06-09T12:34:56.000Z");
-    const envelope = createPlannerDataExportEnvelope(sampleData, exportedAt);
+    const envelope = createPlannerDataExportEnvelope(samplePlannerData, sampleMealData, exportedAt);
 
     expect(envelope).toEqual({
       app: PLANNER_DATA_EXPORT_APP,
       version: PLANNER_DATA_EXPORT_VERSION,
       exportedAt: "2026-06-09T12:34:56.000Z",
-      data: sampleData
+      data: samplePlannerData,
+      meals: sampleMealData
     });
   });
 
   it("serializes export data as formatted json", () => {
-    const text = serializePlannerDataExport(sampleData, new Date("2026-06-09T12:34:56.000Z"));
+    const text = serializePlannerDataExport(samplePlannerData, sampleMealData, new Date("2026-06-09T12:34:56.000Z"));
 
     expect(text).toContain("\n  \"app\": \"super-planner-9000\",");
-    expect(text).toContain("\n  \"version\": 1,");
+    expect(text).toContain("\n  \"version\": 2,");
     expect(text).toContain("\n  \"data\": {");
+    expect(text).toContain("\n  \"meals\": {");
   });
 
-  it("strips non-persisted fields like history from exported data", () => {
+  it("strips non-persisted fields like history from exported planner data", () => {
     const exportedAt = new Date("2026-06-09T12:34:56.000Z");
     const envelope = createPlannerDataExportEnvelope(
       {
-        ...sampleData,
+        ...samplePlannerData,
         history: {
           past: [{ categories: [], segmentsByDate: {} }],
-          present: sampleData,
+          present: samplePlannerData,
           future: []
         }
-      } as unknown as typeof sampleData,
+      } as unknown as typeof samplePlannerData,
+      sampleMealData,
       exportedAt
     );
 
-    expect(envelope.data).toEqual(sampleData);
+    expect(envelope.data).toEqual(samplePlannerData);
     expect(envelope.data).not.toHaveProperty("history");
   });
 
@@ -69,12 +86,28 @@ describe("plannerDataIO", () => {
       app: PLANNER_DATA_EXPORT_APP,
       version: PLANNER_DATA_EXPORT_VERSION,
       exportedAt: "2026-06-09T12:34:56.000Z",
-      data: sampleData
+      data: samplePlannerData,
+      meals: sampleMealData
     });
 
     const result = parsePlannerDataImport(payload);
 
-    expect(result).toEqual({ ok: true, data: sampleData });
+    expect(result).toEqual({ ok: true, data: samplePlannerData, meals: sampleMealData });
+  });
+
+  it("parses a valid payload with empty meals", () => {
+    const emptyMeals = { components: [], meals: [] };
+    const payload = JSON.stringify({
+      app: PLANNER_DATA_EXPORT_APP,
+      version: PLANNER_DATA_EXPORT_VERSION,
+      exportedAt: "2026-06-09T12:34:56.000Z",
+      data: samplePlannerData,
+      meals: emptyMeals
+    });
+
+    const result = parsePlannerDataImport(payload);
+
+    expect(result).toEqual({ ok: true, data: samplePlannerData, meals: emptyMeals });
   });
 
   it("rejects unsupported versions before validating the payload", () => {
@@ -83,24 +116,53 @@ describe("plannerDataIO", () => {
         app: PLANNER_DATA_EXPORT_APP,
         version: 999,
         exportedAt: "2026-06-09T12:34:56.000Z",
-        data: { categories: [], segmentsByDate: { broken: [{ bad: true }] } }
+        data: { categories: [], segmentsByDate: { broken: [{ bad: true }] } },
+        meals: { components: [], meals: [] }
       })
     );
 
     expect(result).toEqual({ ok: false, error: "Unsupported import version: 999." });
   });
 
-  it("rejects malformed data after version validation", () => {
+  it("rejects malformed planner data after version validation", () => {
     const result = parsePlannerDataImport(
       JSON.stringify({
         app: PLANNER_DATA_EXPORT_APP,
         version: PLANNER_DATA_EXPORT_VERSION,
         exportedAt: "2026-06-09T12:34:56.000Z",
-        data: { categories: [], segmentsByDate: { broken: [{ bad: true }] } }
+        data: { categories: [], segmentsByDate: { broken: [{ bad: true }] } },
+        meals: { components: [], meals: [] }
       })
     );
 
     expect(result).toEqual({ ok: false, error: "Import file does not contain valid planner data." });
+  });
+
+  it("rejects malformed meal data after planner data validates", () => {
+    const result = parsePlannerDataImport(
+      JSON.stringify({
+        app: PLANNER_DATA_EXPORT_APP,
+        version: PLANNER_DATA_EXPORT_VERSION,
+        exportedAt: "2026-06-09T12:34:56.000Z",
+        data: { categories: [], segmentsByDate: {} },
+        meals: { components: [{ bad: true }], meals: [] }
+      })
+    );
+
+    expect(result).toEqual({ ok: false, error: "Import file does not contain valid meal data." });
+  });
+
+  it("rejects a payload missing the meals key", () => {
+    const result = parsePlannerDataImport(
+      JSON.stringify({
+        app: PLANNER_DATA_EXPORT_APP,
+        version: PLANNER_DATA_EXPORT_VERSION,
+        exportedAt: "2026-06-09T12:34:56.000Z",
+        data: { categories: [], segmentsByDate: {} }
+      })
+    );
+
+    expect(result).toEqual({ ok: false, error: "Import file does not contain valid meal data." });
   });
 
   it("rejects invalid json", () => {

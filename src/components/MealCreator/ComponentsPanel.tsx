@@ -1,8 +1,8 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, type FormEvent } from "react";
+import { isComponentNameTaken } from "../../lib/mealData";
+import { useMealCreatorFormStore } from "../../store/mealCreatorFormStore";
 import { useMealStore } from "../../store/mealStore";
 import type { MealComponent } from "../../store/mealStore";
-
-type PanelMode = "list" | "add" | "edit";
 
 const inputClassName =
   "w-full rounded-md border border-app-border bg-app-bg px-3 py-2 text-sm text-app-text placeholder:text-app-muted/60 focus:border-app-accent/60 focus:outline-none focus:ring-2 focus:ring-app-accent/20";
@@ -22,26 +22,24 @@ function ComponentsPanel() {
   const updateComponent = useMealStore((state) => state.updateComponent);
   const deleteComponent = useMealStore((state) => state.deleteComponent);
 
+  const mode = useMealCreatorFormStore((s) => s.componentMode);
+  const editingId = useMealCreatorFormStore((s) => s.componentEditingId);
+  const formName = useMealCreatorFormStore((s) => s.componentFormName);
+  const setForm = useMealCreatorFormStore((s) => s.setComponentForm);
+
   const sortedComponents = useMemo(
     () => [...components].sort((a, b) => a.name.localeCompare(b.name)),
     [components]
   );
 
-  const [mode, setMode] = useState<PanelMode>("list");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [formName, setFormName] = useState("");
-  const [formDescription, setFormDescription] = useState("");
-
-  const canSave = formName.trim().length > 0;
+  const nameTaken = isComponentNameTaken(components, formName, editingId ?? undefined);
+  const canSave = formName.trim().length > 0 && !nameTaken;
 
   /**
    * Opens the add form with an empty state.
    */
   function handleStartAdd(): void {
-    setMode("add");
-    setEditingId(null);
-    setFormName("");
-    setFormDescription("");
+    setForm({ componentMode: "add", componentEditingId: null, componentFormName: "" });
   }
 
   /**
@@ -50,20 +48,18 @@ function ComponentsPanel() {
    * @param component - The component to edit.
    */
   function handleStartEdit(component: MealComponent): void {
-    setMode("edit");
-    setEditingId(component.id);
-    setFormName(component.name);
-    setFormDescription(component.description);
+    setForm({
+      componentMode: "edit",
+      componentEditingId: component.id,
+      componentFormName: component.name,
+    });
   }
 
   /**
    * Discards the active form and returns to list mode.
    */
   function handleCancel(): void {
-    setMode("list");
-    setEditingId(null);
-    setFormName("");
-    setFormDescription("");
+    setForm({ componentMode: "list", componentEditingId: null, componentFormName: "" });
   }
 
   /**
@@ -75,9 +71,9 @@ function ComponentsPanel() {
     event.preventDefault();
     if (!canSave) return;
     if (mode === "add") {
-      addComponent(formName, formDescription);
+      addComponent(formName);
     } else if (mode === "edit" && editingId) {
-      updateComponent(editingId, formName, formDescription);
+      updateComponent(editingId, formName);
     }
     handleCancel();
   }
@@ -101,22 +97,18 @@ function ComponentsPanel() {
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-app-muted">
             {mode === "add" ? "New Component" : "Edit Component"}
           </p>
-          <div className="space-y-2">
+          <div className="space-y-1">
             <input
               type="text"
               placeholder="Name"
               value={formName}
-              onChange={(e) => setFormName(e.target.value)}
+              onChange={(e) => setForm({ componentFormName: e.target.value })}
               autoFocus
               className={inputClassName}
             />
-            <input
-              type="text"
-              placeholder="Description (optional)"
-              value={formDescription}
-              onChange={(e) => setFormDescription(e.target.value)}
-              className={inputClassName}
-            />
+            {nameTaken && formName.trim().length > 0 && (
+              <p className="text-xs text-red-400">A component with this name already exists.</p>
+            )}
           </div>
           <div className="flex gap-2">
             <button type="submit" disabled={!canSave} className={primaryButtonClassName}>
@@ -140,18 +132,13 @@ function ComponentsPanel() {
             return (
               <li
                 key={component.id}
-                className={`flex items-start justify-between gap-3 rounded-md border p-3 ${
+                className={`flex items-center justify-between gap-3 rounded-md border p-3 ${
                   isBeingEdited
                     ? "border-app-accent/50 bg-app-panel"
                     : "border-app-border bg-app-panel/60"
                 }`}
               >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-app-text">{component.name}</p>
-                  {component.description && (
-                    <p className="truncate text-xs text-app-muted">{component.description}</p>
-                  )}
-                </div>
+                <p className="truncate text-sm font-semibold text-app-text">{component.name}</p>
                 {mode === "list" && (
                   <div className="flex shrink-0 gap-1">
                     <button

@@ -24,18 +24,19 @@ export const useMealStore = create<MealStore>()(
   persist(
     (set) => ({
       ...initialState,
-      addComponent: (name, description) =>
-        set((state) => ({ components: [...state.components, createComponent(name, description)] })),
-      updateComponent: (id, name, description) =>
-        set((state) => ({ components: updateComponentInList(state.components, id, name, description) })),
+      addComponent: (name) =>
+        set((state) => ({ components: [...state.components, createComponent(name)] })),
+      updateComponent: (id, name) =>
+        set((state) => ({ components: updateComponentInList(state.components, id, name) })),
       deleteComponent: (id) =>
         set((state) => removeComponentFromState(state.components, state.meals, id)),
-      addMeal: (name, ingredients) =>
-        set((state) => ({ meals: [...state.meals, createMeal(name, ingredients)] })),
-      updateMeal: (id, name, ingredients) =>
-        set((state) => ({ meals: updateMealInList(state.meals, id, name, ingredients) })),
+      addMeal: (name, description, ingredients) =>
+        set((state) => ({ meals: [...state.meals, createMeal(name, description, ingredients)] })),
+      updateMeal: (id, name, description, ingredients) =>
+        set((state) => ({ meals: updateMealInList(state.meals, id, name, description, ingredients) })),
       deleteMeal: (id) =>
         set((state) => ({ meals: removeMealFromList(state.meals, id) })),
+      replaceMealData: (data) => set({ components: data.components, meals: data.meals }),
       resetMealStore: () => set({ components: [], meals: [] })
     }),
     {
