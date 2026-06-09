@@ -1,0 +1,11 @@
+{
+  "css.lint.unknownAtRules": "ignore",
+  "vitest.enable": true,
+  "vitest.commandLine": "npm run test:watch",
+  "testing.automaticallyOpenPeekView": "never",
+  "testing.defaultGutterClickAction": "run",
+  "cSpell.words": [
+    "Avenir",
+    "partialize"
+  ]
+}

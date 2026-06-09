@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg: #091018;
+  --color-panel: #111c28;
+  --color-surface: #172433;
+  --color-surface-strong: #203246;
+  --color-border: #2f4458;
+  --color-text: #edf6ff;
+  --color-muted: #9ab0c5;
+  --color-accent: #14b8a6;
+  --color-accent-strong: #0f9488;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 1rem;
+
+  --shadow-card: 0 18px 40px -24px rgba(0, 0, 0, 0.75);
+  --shadow-focus: 0 0 0 3px rgba(20, 184, 166, 0.28);
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: "Avenir Next", "Segoe UI", "Noto Sans", sans-serif;
+}
