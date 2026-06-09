@@ -1,10 +1,13 @@
 import CategoryPalette from "./components/CategoryPalette";
 import MonthlyWallCalendar from "./components/MonthlyWallCalendar";
+import PortraitWarningOverlay from "./components/PortraitWarningOverlay";
 import TimelineTrack from "./components/TimelineTrack";
 import { formatCalendarDateLabel, getRelativeCalendarDateKey } from "./lib/calendar";
 import { usePlannerStore } from "./store/plannerStore";
 import { useState } from "react";
 import type { PlannerDateKey, PlannerSegment } from "./store/plannerStore";
+
+const PORTRAIT_WARNING_SESSION_KEY = "sp9000-portrait-warning-dismissed";
 
 /**
  * Composes the planner page shell from the timeline track and category palette.
@@ -27,6 +30,13 @@ function App() {
   const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
   const [copiedTimelineSegments, setCopiedTimelineSegments] = useState<PlannerSegment[] | null>(null);
   const [selectedDateKey, setSelectedDateKey] = useState<PlannerDateKey | null>(null);
+  const [isPortraitWarningDismissed, setIsPortraitWarningDismissed] = useState<boolean>(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return window.sessionStorage.getItem(PORTRAIT_WARNING_SESSION_KEY) === "true";
+  });
   const canPasteTimeline = copiedTimelineSegments !== null;
   const selectedDateSegments = selectedDateKey ? (segmentsByDate[selectedDateKey] ?? []) : [];
   const selectedDateTitle = selectedDateKey ? formatCalendarDateLabel(selectedDateKey) : "";
@@ -69,12 +79,21 @@ function App() {
     setSelectedDateKey(null);
   }
 
+  /**
+   * Hides the portrait warning overlay for the duration of the current browser session.
+   */
+  function handleDismissPortraitWarning(): void {
+    setIsPortraitWarningDismissed(true);
+    window.sessionStorage.setItem(PORTRAIT_WARNING_SESSION_KEY, "true");
+  }
+
   return (
-    <main
-      className={`min-h-screen bg-app-bg px-4 py-5 text-app-text lg:px-6 lg:py-6 ${selectedDateKey ? "pb-[37rem] lg:pb-[39rem]" : "pb-32 lg:pb-36"} ${draggingCategoryId ? "cursor-grabbing" : ""}`}
-      onPointerUp={() => setDraggingCategoryId(null)}
-    >
-      <section className="mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-[96rem] flex-col gap-5 rounded-lg bg-app-panel p-5 shadow-card lg:min-h-[calc(100vh-3rem)] lg:p-6">
+    <>
+      <main
+        className={`min-h-screen bg-app-bg px-4 py-5 text-app-text lg:px-6 lg:py-6 ${selectedDateKey ? "pb-[37rem] lg:pb-[39rem]" : "pb-32 lg:pb-36"} ${draggingCategoryId ? "cursor-grabbing" : ""}`}
+        onPointerUp={() => setDraggingCategoryId(null)}
+      >
+        <section className="mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-[96rem] flex-col gap-5 rounded-lg bg-app-panel p-5 shadow-card lg:min-h-[calc(100vh-3rem)] lg:p-6">
         <header className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-2">
             <p className="text-sm font-medium uppercase tracking-[0.24em] text-app-muted">
@@ -98,94 +117,100 @@ function App() {
           </div>
         </header>
 
-        <section className="flex flex-1 flex-col gap-5">
-          <TimelineTrack
-            title="Today"
-            categories={categories}
-            segments={todaySegments}
-            canPasteTimeline={canPasteTimeline}
-            onMoveSegment={(segmentId, nextStartSlot) => moveSegmentForDate(todayDateKey, segmentId, nextStartSlot)}
-            onResizeSegment={(segmentId, nextStartSlot, nextEndSlot) =>
-              resizeSegmentForDate(todayDateKey, segmentId, nextStartSlot, nextEndSlot)
-            }
-            draggingCategoryId={draggingCategoryId}
-            onCopyTimeline={() => handleCopyTimeline(todayDateKey)}
-            onPasteTimeline={() => handlePasteTimeline(todayDateKey)}
-            onDropCategory={(categoryId, startSlot, endSlot) =>
-              handleDropCategory(todayDateKey, categoryId, startSlot, endSlot)
-            }
-            onDeleteSegment={(segmentId) => deleteSegmentForDate(todayDateKey, segmentId)}
-            showCurrentTimeMarker
-          />
+          <section className="flex flex-1 flex-col gap-5">
+            <TimelineTrack
+              title="Today"
+              categories={categories}
+              segments={todaySegments}
+              canPasteTimeline={canPasteTimeline}
+              onMoveSegment={(segmentId, nextStartSlot) => moveSegmentForDate(todayDateKey, segmentId, nextStartSlot)}
+              onResizeSegment={(segmentId, nextStartSlot, nextEndSlot) =>
+                resizeSegmentForDate(todayDateKey, segmentId, nextStartSlot, nextEndSlot)
+              }
+              draggingCategoryId={draggingCategoryId}
+              onCopyTimeline={() => handleCopyTimeline(todayDateKey)}
+              onPasteTimeline={() => handlePasteTimeline(todayDateKey)}
+              onDropCategory={(categoryId, startSlot, endSlot) =>
+                handleDropCategory(todayDateKey, categoryId, startSlot, endSlot)
+              }
+              onDeleteSegment={(segmentId) => deleteSegmentForDate(todayDateKey, segmentId)}
+              showCurrentTimeMarker
+            />
 
-          <TimelineTrack
-            title="Tomorrow"
-            categories={categories}
-            segments={tomorrowSegments}
-            canPasteTimeline={canPasteTimeline}
-            onMoveSegment={(segmentId, nextStartSlot) => moveSegmentForDate(tomorrowDateKey, segmentId, nextStartSlot)}
-            onResizeSegment={(segmentId, nextStartSlot, nextEndSlot) =>
-              resizeSegmentForDate(tomorrowDateKey, segmentId, nextStartSlot, nextEndSlot)
-            }
-            draggingCategoryId={draggingCategoryId}
-            onCopyTimeline={() => handleCopyTimeline(tomorrowDateKey)}
-            onPasteTimeline={() => handlePasteTimeline(tomorrowDateKey)}
-            onDropCategory={(categoryId, startSlot, endSlot) =>
-              handleDropCategory(tomorrowDateKey, categoryId, startSlot, endSlot)
-            }
-            onDeleteSegment={(segmentId) => deleteSegmentForDate(tomorrowDateKey, segmentId)}
-          />
+            <TimelineTrack
+              title="Tomorrow"
+              categories={categories}
+              segments={tomorrowSegments}
+              canPasteTimeline={canPasteTimeline}
+              onMoveSegment={(segmentId, nextStartSlot) => moveSegmentForDate(tomorrowDateKey, segmentId, nextStartSlot)}
+              onResizeSegment={(segmentId, nextStartSlot, nextEndSlot) =>
+                resizeSegmentForDate(tomorrowDateKey, segmentId, nextStartSlot, nextEndSlot)
+              }
+              draggingCategoryId={draggingCategoryId}
+              onCopyTimeline={() => handleCopyTimeline(tomorrowDateKey)}
+              onPasteTimeline={() => handlePasteTimeline(tomorrowDateKey)}
+              onDropCategory={(categoryId, startSlot, endSlot) =>
+                handleDropCategory(tomorrowDateKey, categoryId, startSlot, endSlot)
+              }
+              onDeleteSegment={(segmentId) => deleteSegmentForDate(tomorrowDateKey, segmentId)}
+            />
 
-          <MonthlyWallCalendar selectedDateKey={selectedDateKey} onSelectDate={setSelectedDateKey} />
+            <MonthlyWallCalendar selectedDateKey={selectedDateKey} onSelectDate={setSelectedDateKey} />
+          </section>
         </section>
-      </section>
 
-      <section className="fixed inset-x-0 bottom-0 z-50 px-4 pb-4 lg:px-6 lg:pb-5">
-        <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-4 rounded-lg border border-app-border bg-app-surface/95 p-4 shadow-card backdrop-blur">
-          {selectedDateKey ? (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-app-muted">
-                  Editing {selectedDateTitle}
-                </p>
-                <button
-                  type="button"
-                  onClick={handleCloseSelectedTimeline}
-                  className="rounded-md border border-app-border px-2 py-1 text-xs font-medium text-app-muted transition hover:border-app-text hover:text-app-text"
-                  aria-label="Close selected date timeline editor"
-                >
-                  Close
-                </button>
+        <section className="fixed inset-x-0 bottom-0 z-50 px-4 pb-4 lg:px-6 lg:pb-5">
+          <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-4 rounded-lg border border-app-border bg-app-surface/95 p-4 shadow-card backdrop-blur">
+            {selectedDateKey ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-app-muted">
+                    Editing {selectedDateTitle}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleCloseSelectedTimeline}
+                    className="rounded-md border border-app-border px-2 py-1 text-xs font-medium text-app-muted transition hover:border-app-text hover:text-app-text"
+                    aria-label="Close selected date timeline editor"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <TimelineTrack
+                  title={selectedDateTitle}
+                  categories={categories}
+                  segments={selectedDateSegments}
+                  canPasteTimeline={canPasteTimeline}
+                  onMoveSegment={(segmentId, nextStartSlot) => moveSegmentForDate(selectedDateKey, segmentId, nextStartSlot)}
+                  onResizeSegment={(segmentId, nextStartSlot, nextEndSlot) =>
+                    resizeSegmentForDate(selectedDateKey, segmentId, nextStartSlot, nextEndSlot)
+                  }
+                  draggingCategoryId={draggingCategoryId}
+                  onCopyTimeline={() => handleCopyTimeline(selectedDateKey)}
+                  onPasteTimeline={() => handlePasteTimeline(selectedDateKey)}
+                  onDropCategory={(categoryId, startSlot, endSlot) =>
+                    handleDropCategory(selectedDateKey, categoryId, startSlot, endSlot)
+                  }
+                  onDeleteSegment={(segmentId) => deleteSegmentForDate(selectedDateKey, segmentId)}
+                />
               </div>
+            ) : null}
 
-              <TimelineTrack
-                title={selectedDateTitle}
-                categories={categories}
-                segments={selectedDateSegments}
-                canPasteTimeline={canPasteTimeline}
-                onMoveSegment={(segmentId, nextStartSlot) => moveSegmentForDate(selectedDateKey, segmentId, nextStartSlot)}
-                onResizeSegment={(segmentId, nextStartSlot, nextEndSlot) =>
-                  resizeSegmentForDate(selectedDateKey, segmentId, nextStartSlot, nextEndSlot)
-                }
-                draggingCategoryId={draggingCategoryId}
-                onCopyTimeline={() => handleCopyTimeline(selectedDateKey)}
-                onPasteTimeline={() => handlePasteTimeline(selectedDateKey)}
-                onDropCategory={(categoryId, startSlot, endSlot) =>
-                  handleDropCategory(selectedDateKey, categoryId, startSlot, endSlot)
-                }
-                onDeleteSegment={(segmentId) => deleteSegmentForDate(selectedDateKey, segmentId)}
-              />
-            </div>
-          ) : null}
+            <CategoryPalette
+              categories={categories}
+              draggingCategoryId={draggingCategoryId}
+              onCategoryDragStart={setDraggingCategoryId}
+            />
+          </div>
+        </section>
+      </main>
 
-          <CategoryPalette
-            categories={categories}
-            draggingCategoryId={draggingCategoryId}
-            onCategoryDragStart={setDraggingCategoryId}
-          />
-        </div>
-      </section>
-    </main>
+      <PortraitWarningOverlay
+        isDismissed={isPortraitWarningDismissed}
+        onDismiss={handleDismissPortraitWarning}
+      />
+    </>
   );
 }
 

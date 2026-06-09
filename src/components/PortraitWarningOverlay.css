@@ -1,0 +1,79 @@
+.portrait-warning-overlay {
+  display: none;
+}
+
+.portrait-warning-overlay--dismissed {
+  display: none !important;
+}
+
+@media (orientation: portrait) {
+  .portrait-warning-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    display: grid;
+    place-items: center;
+    padding: 1.25rem;
+    background:
+      radial-gradient(circle at 20% 20%, rgba(20, 184, 166, 0.24), transparent 55%),
+      radial-gradient(circle at 80% 80%, rgba(32, 50, 70, 0.7), transparent 52%),
+      rgba(5, 10, 16, 0.92);
+    backdrop-filter: blur(7px);
+  }
+
+  .portrait-warning-card {
+    width: min(26rem, 100%);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(150deg, rgba(23, 36, 51, 0.95), rgba(15, 24, 35, 0.95));
+    box-shadow: var(--shadow-card);
+    padding: 1.25rem;
+  }
+
+  .portrait-warning-eyebrow {
+    margin: 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+    font-weight: 700;
+  }
+
+  .portrait-warning-title {
+    margin: 0.55rem 0 0;
+    font-size: 1.55rem;
+    line-height: 1.2;
+    color: var(--color-text);
+  }
+
+  .portrait-warning-copy {
+    margin: 0.7rem 0 0;
+    color: var(--color-muted);
+    font-size: 0.96rem;
+    line-height: 1.45;
+  }
+
+  .portrait-warning-actions {
+    margin-top: 1rem;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .portrait-warning-dismiss {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--color-text);
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 0.5rem 0.72rem;
+    cursor: pointer;
+    transition: border-color 140ms ease, background-color 140ms ease;
+  }
+
+  .portrait-warning-dismiss:hover {
+    border-color: var(--color-accent);
+    background: rgba(20, 184, 166, 0.12);
+  }
+}
