@@ -1,0 +1,14 @@
+name: On Push Main
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  check:
+    uses: ./.github/workflows/check.yml
+
+  deploy:
+    needs: check
+    uses: ./.github/workflows/deploy.yml
