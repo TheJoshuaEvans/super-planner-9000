@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { usePlannerStore } from "./plannerStore";
 
+const DATE_A = "2026-06-09";
+const DATE_B = "2026-06-10";
+
 describe("plannerStore", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -17,14 +20,13 @@ describe("plannerStore", () => {
       "eat",
       "travel"
     ]);
-    expect(state.segmentsByDay.today).toEqual([]);
-    expect(state.segmentsByDay.tomorrow).toEqual([]);
+    expect(state.segmentsByDate).toEqual({});
   });
 
   it("adds a category into the first hour", () => {
-    usePlannerStore.getState().addCategory("today", "work", 0, 4);
+    usePlannerStore.getState().addCategoryForDate(DATE_A, "work", 0, 4);
 
-    const segments = usePlannerStore.getState().segmentsByDay.today;
+    const segments = usePlannerStore.getState().segmentsByDate[DATE_A] ?? [];
     expect(segments).toHaveLength(1);
     expect(segments[0]).toMatchObject({
       categoryId: "work",
@@ -34,13 +36,13 @@ describe("plannerStore", () => {
   });
 
   it("overwrites overlapping first-hour segment while preserving trailing time", () => {
-    usePlannerStore.getState().setSegments("today", [
+    usePlannerStore.getState().setSegmentsForDate(DATE_A, [
       { id: "a", categoryId: "sleep", startSlot: 0, endSlot: 8 }
     ]);
 
-    usePlannerStore.getState().addCategory("today", "eat", 0, 4);
+    usePlannerStore.getState().addCategoryForDate(DATE_A, "eat", 0, 4);
 
-    const segments = usePlannerStore.getState().segmentsByDay.today;
+    const segments = usePlannerStore.getState().segmentsByDate[DATE_A] ?? [];
     expect(segments).toHaveLength(2);
     expect(segments[0]).toMatchObject({ categoryId: "eat", startSlot: 0, endSlot: 4 });
     expect(segments[1]).toMatchObject({ categoryId: "sleep", startSlot: 4, endSlot: 8 });
@@ -48,24 +50,23 @@ describe("plannerStore", () => {
 
   it("clears and resets planner state", () => {
     const store = usePlannerStore.getState();
-    store.addCategory("today", "play", 0, 4);
-    store.clearSegments("today");
+    store.addCategoryForDate(DATE_A, "play", 0, 4);
+    store.clearSegmentsForDate(DATE_A);
 
-    expect(usePlannerStore.getState().segmentsByDay.today).toEqual([]);
+    expect(usePlannerStore.getState().segmentsByDate[DATE_A]).toEqual([]);
 
-    store.setSegments("today", [{ id: "x", categoryId: "travel", startSlot: 12, endSlot: 16 }]);
+    store.setSegmentsForDate(DATE_A, [{ id: "x", categoryId: "travel", startSlot: 12, endSlot: 16 }]);
     store.resetPlanner();
 
     const reset = usePlannerStore.getState();
-    expect(reset.segmentsByDay.today).toEqual([]);
-    expect(reset.segmentsByDay.tomorrow).toEqual([]);
+    expect(reset.segmentsByDate).toEqual({});
     expect(reset.categories).toHaveLength(5);
   });
 
   it("adds a category for an arbitrary slot range", () => {
-    usePlannerStore.getState().addCategory("today", "travel", 12, 20);
+    usePlannerStore.getState().addCategoryForDate(DATE_A, "travel", 12, 20);
 
-    const segments = usePlannerStore.getState().segmentsByDay.today;
+    const segments = usePlannerStore.getState().segmentsByDate[DATE_A] ?? [];
     expect(segments).toHaveLength(1);
     expect(segments[0]).toMatchObject({
       categoryId: "travel",
@@ -75,95 +76,95 @@ describe("plannerStore", () => {
   });
 
   it("ignores invalid ranges where end is not after start", () => {
-    usePlannerStore.getState().addCategory("today", "work", 10, 10);
-    usePlannerStore.getState().addCategory("today", "work", 14, 8);
+    usePlannerStore.getState().addCategoryForDate(DATE_A, "work", 10, 10);
+    usePlannerStore.getState().addCategoryForDate(DATE_A, "work", 14, 8);
 
-    expect(usePlannerStore.getState().segmentsByDay.today).toEqual([]);
+    expect(usePlannerStore.getState().segmentsByDate[DATE_A]).toEqual(undefined);
   });
 
   it("moves a segment to a snapped start slot while preserving duration", () => {
-    usePlannerStore.getState().setSegments("today", [
+    usePlannerStore.getState().setSegmentsForDate(DATE_A, [
       { id: "a", categoryId: "work", startSlot: 4, endSlot: 8 }
     ]);
 
-    usePlannerStore.getState().moveSegment("today", "a", 20);
+    usePlannerStore.getState().moveSegmentForDate(DATE_A, "a", 20);
 
-    const moved = usePlannerStore.getState().segmentsByDay.today;
+    const moved = usePlannerStore.getState().segmentsByDate[DATE_A] ?? [];
     expect(moved).toHaveLength(1);
     expect(moved[0]).toMatchObject({ id: "a", startSlot: 20, endSlot: 24 });
   });
 
   it("resizes a segment to a new range via store action", () => {
-    usePlannerStore.getState().setSegments("today", [
+    usePlannerStore.getState().setSegmentsForDate(DATE_A, [
       { id: "a", categoryId: "work", startSlot: 4, endSlot: 8 }
     ]);
 
-    usePlannerStore.getState().resizeSegment("today", "a", 4, 16);
+    usePlannerStore.getState().resizeSegmentForDate(DATE_A, "a", 4, 16);
 
-    const resized = usePlannerStore.getState().segmentsByDay.today;
+    const resized = usePlannerStore.getState().segmentsByDate[DATE_A] ?? [];
     expect(resized).toHaveLength(1);
     expect(resized[0]).toMatchObject({ id: "a", startSlot: 4, endSlot: 16 });
   });
 
   it("deletes a segment from the selected day only", () => {
     const store = usePlannerStore.getState();
-    store.setSegments("today", [
+    store.setSegmentsForDate(DATE_A, [
       { id: "today-a", categoryId: "work", startSlot: 4, endSlot: 8 }
     ]);
-    store.setSegments("tomorrow", [
+    store.setSegmentsForDate(DATE_B, [
       { id: "tomorrow-a", categoryId: "play", startSlot: 8, endSlot: 12 }
     ]);
 
-    store.deleteSegment("today", "today-a");
+    store.deleteSegmentForDate(DATE_A, "today-a");
 
     const state = usePlannerStore.getState();
-    expect(state.segmentsByDay.today).toEqual([]);
-    expect(state.segmentsByDay.tomorrow).toHaveLength(1);
-    expect(state.segmentsByDay.tomorrow[0]).toMatchObject({ id: "tomorrow-a" });
+    expect(state.segmentsByDate[DATE_A]).toEqual([]);
+    expect(state.segmentsByDate[DATE_B]).toHaveLength(1);
+    expect(state.segmentsByDate[DATE_B][0]).toMatchObject({ id: "tomorrow-a" });
   });
 
-  it("keeps today and tomorrow segment collections independent", () => {
+  it("keeps segment collections independent across date keys", () => {
     const store = usePlannerStore.getState();
-    store.addCategory("today", "work", 0, 4);
-    store.addCategory("tomorrow", "play", 8, 12);
+    store.addCategoryForDate(DATE_A, "work", 0, 4);
+    store.addCategoryForDate(DATE_B, "play", 8, 12);
 
     const state = usePlannerStore.getState();
-    expect(state.segmentsByDay.today).toHaveLength(1);
-    expect(state.segmentsByDay.today[0]).toMatchObject({ categoryId: "work", startSlot: 0, endSlot: 4 });
-    expect(state.segmentsByDay.tomorrow).toHaveLength(1);
-    expect(state.segmentsByDay.tomorrow[0]).toMatchObject({ categoryId: "play", startSlot: 8, endSlot: 12 });
+    expect(state.segmentsByDate[DATE_A]).toHaveLength(1);
+    expect(state.segmentsByDate[DATE_A][0]).toMatchObject({ categoryId: "work", startSlot: 0, endSlot: 4 });
+    expect(state.segmentsByDate[DATE_B]).toHaveLength(1);
+    expect(state.segmentsByDate[DATE_B][0]).toMatchObject({ categoryId: "play", startSlot: 8, endSlot: 12 });
   });
 
   it("pastes copied segments into a target day using overwrite merge", () => {
     const store = usePlannerStore.getState();
-    store.setSegments("today", [
+    store.setSegmentsForDate(DATE_A, [
       { id: "a", categoryId: "sleep", startSlot: 0, endSlot: 8 }
     ]);
 
-    store.pasteSegments("today", [
+    store.pasteSegmentsForDate(DATE_A, [
       { id: "copy-a", categoryId: "work", startSlot: 4, endSlot: 12 }
     ]);
 
-    const today = usePlannerStore.getState().segmentsByDay.today;
-    expect(today).toHaveLength(2);
-    expect(today[0]).toMatchObject({ categoryId: "sleep", startSlot: 0, endSlot: 4 });
-    expect(today[1]).toMatchObject({ categoryId: "work", startSlot: 4, endSlot: 12 });
-    expect(today[1].id).not.toBe("copy-a");
+    const forDate = usePlannerStore.getState().segmentsByDate[DATE_A] ?? [];
+    expect(forDate).toHaveLength(2);
+    expect(forDate[0]).toMatchObject({ categoryId: "sleep", startSlot: 0, endSlot: 4 });
+    expect(forDate[1]).toMatchObject({ categoryId: "work", startSlot: 4, endSlot: 12 });
+    expect(forDate[1].id).not.toBe("copy-a");
   });
 
   it("pastes into one day without mutating the other", () => {
     const store = usePlannerStore.getState();
-    store.setSegments("today", [{ id: "today-a", categoryId: "sleep", startSlot: 0, endSlot: 8 }]);
-    store.setSegments("tomorrow", [{ id: "tomorrow-a", categoryId: "play", startSlot: 8, endSlot: 12 }]);
+    store.setSegmentsForDate(DATE_A, [{ id: "today-a", categoryId: "sleep", startSlot: 0, endSlot: 8 }]);
+    store.setSegmentsForDate(DATE_B, [{ id: "tomorrow-a", categoryId: "play", startSlot: 8, endSlot: 12 }]);
 
-    store.pasteSegments("tomorrow", [
+    store.pasteSegmentsForDate(DATE_B, [
       { id: "copy-a", categoryId: "work", startSlot: 0, endSlot: 4 }
     ]);
 
     const state = usePlannerStore.getState();
-    expect(state.segmentsByDay.today).toHaveLength(1);
-    expect(state.segmentsByDay.today[0]).toMatchObject({ id: "today-a" });
-    expect(state.segmentsByDay.tomorrow).toEqual(
+    expect(state.segmentsByDate[DATE_A]).toHaveLength(1);
+    expect(state.segmentsByDate[DATE_A][0]).toMatchObject({ id: "today-a" });
+    expect(state.segmentsByDate[DATE_B]).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ categoryId: "work", startSlot: 0, endSlot: 4 }),
         expect.objectContaining({ id: "tomorrow-a", categoryId: "play", startSlot: 8, endSlot: 12 })

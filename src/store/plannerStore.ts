@@ -22,22 +22,19 @@ export type PlannerSegment = {
   endSlot: number;
 };
 
-/**
- * Supported day buckets for the timeline editor.
- */
-export type PlannerDayKey = "today" | "tomorrow";
+export type PlannerDateKey = string;
 
 /**
- * Per-day segment state map for the planner.
+ * Per-date segment state map for the planner.
  */
-export type PlannerSegmentsByDay = Record<PlannerDayKey, PlannerSegment[]>;
+export type PlannerSegmentsByDate = Record<PlannerDateKey, PlannerSegment[]>;
 
 /**
  * Persisted planner data for the current single-day editor.
  */
 type PlannerState = {
   categories: PlannerCategory[];
-  segmentsByDay: PlannerSegmentsByDay;
+  segmentsByDate: PlannerSegmentsByDate;
 };
 
 /**
@@ -45,39 +42,39 @@ type PlannerState = {
  */
 type PlannerStore = PlannerState & {
   /**
-    * Replaces the full segment list for a given day.
+    * Replaces the full segment list for a given calendar date.
    */
-    setSegments: (dayKey: PlannerDayKey, segments: PlannerSegment[]) => void;
+    setSegmentsForDate: (dateKey: PlannerDateKey, segments: PlannerSegment[]) => void;
 
   /**
-    * Adds a category block over the given slot range for a day, overwriting any overlapping time.
+    * Adds a category block over the given slot range for a date, overwriting overlaps.
    */
-    addCategory: (dayKey: PlannerDayKey, categoryId: string, startSlot: number, endSlot: number) => void;
+    addCategoryForDate: (dateKey: PlannerDateKey, categoryId: string, startSlot: number, endSlot: number) => void;
 
   /**
-    * Moves an existing segment for a day to a new start slot while keeping its duration.
+    * Moves an existing segment for a date while keeping its duration.
    */
-    moveSegment: (dayKey: PlannerDayKey, segmentId: string, nextStartSlot: number) => void;
+    moveSegmentForDate: (dateKey: PlannerDateKey, segmentId: string, nextStartSlot: number) => void;
 
   /**
-    * Resizes an existing segment for a day to a new slot range, enforcing a 15-minute minimum.
+    * Resizes an existing segment for a date to a new slot range.
    */
-    resizeSegment: (dayKey: PlannerDayKey, segmentId: string, nextStartSlot: number, nextEndSlot: number) => void;
+    resizeSegmentForDate: (dateKey: PlannerDateKey, segmentId: string, nextStartSlot: number, nextEndSlot: number) => void;
 
   /**
-    * Deletes a segment from the chosen day timeline.
+    * Deletes a segment from the selected date timeline.
    */
-    deleteSegment: (dayKey: PlannerDayKey, segmentId: string) => void;
+    deleteSegmentForDate: (dateKey: PlannerDateKey, segmentId: string) => void;
 
   /**
-    * Pastes copied segments into the selected day using overwrite merge rules.
+    * Pastes copied segments into the selected date using overwrite merge rules.
    */
-    pasteSegments: (dayKey: PlannerDayKey, copiedSegments: PlannerSegment[]) => void;
+    pasteSegmentsForDate: (dateKey: PlannerDateKey, copiedSegments: PlannerSegment[]) => void;
 
   /**
-    * Removes all scheduled segments for the chosen day.
+    * Removes all scheduled segments for the selected date.
    */
-    clearSegments: (dayKey: PlannerDayKey) => void;
+    clearSegmentsForDate: (dateKey: PlannerDateKey) => void;
 
   /**
    * Restores the planner to its default categories and empty timeline.
@@ -101,11 +98,15 @@ const defaultCategories: PlannerCategory[] = [
  */
 const initialState: PlannerState = {
   categories: defaultCategories,
-  segmentsByDay: {
-    today: [],
-    tomorrow: []
-  }
+  segmentsByDate: {}
 };
+
+/**
+ * Returns the existing segment array for a date key or an empty list.
+ */
+function segmentsForDate(state: PlannerState, dateKey: PlannerDateKey): PlannerSegment[] {
+  return state.segmentsByDate[dateKey] ?? [];
+}
 
 /**
  * Local persisted Zustand store for the current planner editor.
@@ -114,59 +115,59 @@ export const usePlannerStore = create<PlannerStore>()(
   persist(
     (set) => ({
       ...initialState,
-      setSegments: (dayKey, segments) =>
+      setSegmentsForDate: (dateKey, segments) =>
         set((state) => ({
-          segmentsByDay: {
-            ...state.segmentsByDay,
-            [dayKey]: segments
+          segmentsByDate: {
+            ...state.segmentsByDate,
+            [dateKey]: segments
           }
         })),
-      addCategory: (dayKey, categoryId, startSlot, endSlot) =>
+      addCategoryForDate: (dateKey, categoryId, startSlot, endSlot) =>
         set((state) => ({
-          segmentsByDay:
+          segmentsByDate:
             endSlot <= startSlot
-              ? state.segmentsByDay
+              ? state.segmentsByDate
               : {
-                  ...state.segmentsByDay,
-                  [dayKey]: applySegmentOverwrite(
-                    state.segmentsByDay[dayKey],
+                  ...state.segmentsByDate,
+                  [dateKey]: applySegmentOverwrite(
+                    segmentsForDate(state, dateKey),
                     createSegment(categoryId, startSlot, endSlot)
                   )
                 }
         })),
-      moveSegment: (dayKey, segmentId, nextStartSlot) =>
+      moveSegmentForDate: (dateKey, segmentId, nextStartSlot) =>
         set((state) => ({
-          segmentsByDay: {
-            ...state.segmentsByDay,
-            [dayKey]: moveSegment(state.segmentsByDay[dayKey], segmentId, nextStartSlot, TOTAL_DAY_SLOTS)
+          segmentsByDate: {
+            ...state.segmentsByDate,
+            [dateKey]: moveSegment(segmentsForDate(state, dateKey), segmentId, nextStartSlot, TOTAL_DAY_SLOTS)
           }
         })),
-      resizeSegment: (dayKey, segmentId, nextStartSlot, nextEndSlot) =>
+      resizeSegmentForDate: (dateKey, segmentId, nextStartSlot, nextEndSlot) =>
         set((state) => ({
-          segmentsByDay: {
-            ...state.segmentsByDay,
-            [dayKey]: resizeSegment(state.segmentsByDay[dayKey], segmentId, nextStartSlot, nextEndSlot, TOTAL_DAY_SLOTS)
+          segmentsByDate: {
+            ...state.segmentsByDate,
+            [dateKey]: resizeSegment(segmentsForDate(state, dateKey), segmentId, nextStartSlot, nextEndSlot, TOTAL_DAY_SLOTS)
           }
         })),
-      deleteSegment: (dayKey, segmentId) =>
+      deleteSegmentForDate: (dateKey, segmentId) =>
         set((state) => ({
-          segmentsByDay: {
-            ...state.segmentsByDay,
-            [dayKey]: state.segmentsByDay[dayKey].filter((segment) => segment.id !== segmentId)
+          segmentsByDate: {
+            ...state.segmentsByDate,
+            [dateKey]: segmentsForDate(state, dateKey).filter((segment) => segment.id !== segmentId)
           }
         })),
-      pasteSegments: (dayKey, copiedSegments) =>
+      pasteSegmentsForDate: (dateKey, copiedSegments) =>
         set((state) => ({
-          segmentsByDay: {
-            ...state.segmentsByDay,
-            [dayKey]: pasteSegmentsWithOverwrite(state.segmentsByDay[dayKey], copiedSegments)
+          segmentsByDate: {
+            ...state.segmentsByDate,
+            [dateKey]: pasteSegmentsWithOverwrite(segmentsForDate(state, dateKey), copiedSegments)
           }
         })),
-      clearSegments: (dayKey) =>
+      clearSegmentsForDate: (dateKey) =>
         set((state) => ({
-          segmentsByDay: {
-            ...state.segmentsByDay,
-            [dayKey]: []
+          segmentsByDate: {
+            ...state.segmentsByDate,
+            [dateKey]: []
           }
         })),
       resetPlanner: () => set({ ...initialState })
@@ -176,7 +177,7 @@ export const usePlannerStore = create<PlannerStore>()(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         categories: state.categories,
-        segmentsByDay: state.segmentsByDay
+        segmentsByDate: state.segmentsByDate
       })
     }
   )
