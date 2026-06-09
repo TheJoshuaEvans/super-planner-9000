@@ -27,11 +27,11 @@ export const APP_TABS = [
     contentKind: "meal-planner"
   },
   {
-    id: "meal-generator",
-    label: "Meal Generator",
-    kicker: "Meal Generator",
-    description: "Stub page for upcoming meal generation workflows.",
-    contentKind: "placeholder"
+    id: "meal-creator",
+    label: "Meal Creator",
+    kicker: "Meal Creator",
+    description: "Stub page for upcoming meal creation workflows.",
+    contentKind: "meal-creator"
   }
 ] as const;
 

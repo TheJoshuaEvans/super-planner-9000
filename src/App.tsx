@@ -1,4 +1,5 @@
 import CategoryPalette from "./components/CategoryPalette/CategoryPalette";
+import MealCreator from "./components/MealCreator/MealCreator";
 import MealTimelineTrack from "./components/MealTimelineTrack/MealTimelineTrack";
 import MonthlyWallCalendar from "./components/MonthlyWallCalendar/MonthlyWallCalendar";
 import PlannerHistoryControls from "./components/PlannerHistoryControls/PlannerHistoryControls";
@@ -398,12 +399,14 @@ function App() {
                 />
               ))}
             </section>
+          ) : activeTabDefinition.contentKind === "meal-creator" ? (
+            <section className="flex flex-1 flex-col gap-5">
+              <MealCreator />
+            </section>
           ) : (
             <section className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-app-border bg-app-surface/70 px-6 py-16 text-center">
-              <div className="max-w-md space-y-3">
-                <p className="text-sm font-medium uppercase tracking-[0.24em] text-app-muted">{activeTabDefinition.kicker}</p>
+              <div className="max-w-md">
                 <h2 className="text-2xl font-semibold tracking-tight">Coming soon</h2>
-                <p className="text-sm text-app-muted sm:text-base">{activeTabDefinition.description}</p>
               </div>
             </section>
           )}
