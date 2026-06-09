@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
-import { buildCalendarMonthView, getMonthStart, shiftMonth } from "../lib/calendar";
+import { buildCalendarMonthView, getMonthStart, shiftMonth } from "../../lib/calendar";
 import {
   buildCalendarStatusLabel,
   buildDateKeysByWeekday,
   buildSegmentPreviewPercentages,
   toPreviewFill
-} from "../lib/monthlyCalendarPreview";
-import type { PlannerCategory, PlannerSegmentsByDate } from "../store/plannerStore";
+} from "../../lib/monthlyCalendarPreview";
+import type { PlannerCategory, PlannerSegmentsByDate } from "../../store/plannerStore";
 
 type MonthlyWallCalendarProps = {
   onSelectDate?: (dateKey: string) => void;

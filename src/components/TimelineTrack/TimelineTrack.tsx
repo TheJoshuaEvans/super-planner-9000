@@ -10,10 +10,10 @@ import {
   quarterHourMarks,
   snapSlot,
   TOTAL_DAY_SLOTS
-} from "../lib/timeline";
-import { resolveCurrentTimePercent } from "../lib/timelineNow";
-import { useTimelineMarkerClock } from "../hooks/useTimelineMarkerClock";
-import type { PlannerCategory, PlannerSegment } from "../store/plannerStore";
+} from "../../lib/timeline";
+import { resolveCurrentTimePercent } from "../../lib/timelineNow";
+import { useTimelineMarkerClock } from "../../hooks/useTimelineMarkerClock";
+import type { PlannerCategory, PlannerSegment } from "../../store/plannerStore";
 import {
   isPointerInRect,
   resolveDropPreviewSlot,
@@ -23,8 +23,8 @@ import {
   type MoveInteraction,
   type ResizeInteraction
 } from "./timelineTrackInteractions";
-import { getTimelineControlButtonClassName } from "./timelineControlButton";
-import Tooltip from "./Tooltip";
+import { getTimelineControlButtonClassName } from "../shared/timelineControlButton";
+import Tooltip from "../Tooltip/Tooltip";
 
 type TimelineTrackProps = {
   title: string;

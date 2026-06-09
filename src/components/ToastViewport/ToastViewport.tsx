@@ -1,4 +1,4 @@
-import { useToastStore } from "../store/toastStore";
+import { useToastStore } from "../../store/toastStore";
 
 const toastLevelClasses = {
   info: "border-sky-400/50 bg-sky-500/15 text-sky-100",

@@ -1,4 +1,4 @@
-import { getTimelineControlButtonClassName } from "./timelineControlButton";
+import { getTimelineControlButtonClassName } from "../shared/timelineControlButton";
 
 type PlannerHistoryControlsProps = {
   canUndo: boolean;

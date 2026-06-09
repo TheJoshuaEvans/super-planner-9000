@@ -1,10 +1,10 @@
-import CategoryPalette from "./components/CategoryPalette";
-import MealTimelineTrack from "./components/MealTimelineTrack";
-import MonthlyWallCalendar from "./components/MonthlyWallCalendar";
-import PlannerHistoryControls from "./components/PlannerHistoryControls";
-import PortraitWarningOverlay from "./components/PortraitWarningOverlay";
-import ToastViewport from "./components/ToastViewport";
-import TimelineTrack from "./components/TimelineTrack";
+import CategoryPalette from "./components/CategoryPalette/CategoryPalette";
+import MealTimelineTrack from "./components/MealTimelineTrack/MealTimelineTrack";
+import MonthlyWallCalendar from "./components/MonthlyWallCalendar/MonthlyWallCalendar";
+import PlannerHistoryControls from "./components/PlannerHistoryControls/PlannerHistoryControls";
+import PortraitWarningOverlay from "./components/PortraitWarningOverlay/PortraitWarningOverlay";
+import ToastViewport from "./components/ToastViewport/ToastViewport";
+import TimelineTrack from "./components/TimelineTrack/TimelineTrack";
 import { usePlannerUndoRedoHotkeys } from "./hooks/usePlannerUndoRedoHotkeys";
 import {
   ACTIVE_TAB_LOCAL_STORAGE_KEY,

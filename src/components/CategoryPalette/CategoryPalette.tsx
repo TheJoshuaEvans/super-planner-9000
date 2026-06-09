@@ -1,4 +1,4 @@
-import type { PlannerCategory } from "../store/plannerStore";
+import type { PlannerCategory } from "../../store/plannerStore";
 
 type CategoryPaletteProps = {
   categories: PlannerCategory[];

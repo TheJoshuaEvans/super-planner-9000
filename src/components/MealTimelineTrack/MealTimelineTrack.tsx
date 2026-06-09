@@ -7,11 +7,11 @@ import {
   hourMarks,
   quarterHourMarks,
   TOTAL_DAY_SLOTS
-} from "../lib/timeline";
-import { resolveCurrentTimePercent } from "../lib/timelineNow";
-import { useTimelineMarkerClock } from "../hooks/useTimelineMarkerClock";
-import type { PlannerCategory, PlannerSegment } from "../store/plannerStore";
-import Tooltip from "./Tooltip";
+} from "../../lib/timeline";
+import { resolveCurrentTimePercent } from "../../lib/timelineNow";
+import { useTimelineMarkerClock } from "../../hooks/useTimelineMarkerClock";
+import type { PlannerCategory, PlannerSegment } from "../../store/plannerStore";
+import Tooltip from "../Tooltip/Tooltip";
 
 type MealTimelineTrackProps = {
   weekdayLabel: string;

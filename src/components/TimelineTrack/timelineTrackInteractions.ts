@@ -3,7 +3,7 @@ import {
   DEFAULT_SEGMENT_DURATION_SLOTS,
   snapSlot,
   TOTAL_DAY_SLOTS
-} from "../lib/timeline";
+} from "../../lib/timeline";
 
 export type MoveInteraction = {
   mode: "move";
