@@ -11,6 +11,7 @@
 9. All (non-boilerplate) functions should be documented with JSDoc
 10. Function documentation must be concise, focusing on inputs, outputs, and side-effects
 11. All functionality should be isolated into testable methods, and have associated unit tests
+12. Colorblind accessibility must be fully supported
 
 # Stack Specifications
 

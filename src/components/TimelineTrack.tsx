@@ -297,7 +297,7 @@ function TimelineTrack({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="rounded-md border border-app-border bg-app-panel px-3 py-2 text-xs font-medium uppercase tracking-wide text-app-muted transition hover:border-app-accent/70 hover:text-app-text"
+            className="rounded-md border border-app-border bg-app-panel/85 px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-app-muted transition hover:border-app-accent/70 hover:text-app-text"
             onClick={onCopyTimeline}
           >
             Copy
@@ -319,10 +319,10 @@ function TimelineTrack({
 
           <div
             ref={trashRef}
-            className={`pointer-events-none flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium uppercase tracking-wide transition ${
+            className={`pointer-events-none flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
               isTrashHot
                 ? "border-red-400/80 bg-red-500/20 text-red-200"
-                : "border-app-border bg-app-panel text-app-muted"
+                : "border-app-border bg-app-panel/85 text-app-muted"
             }`}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9">

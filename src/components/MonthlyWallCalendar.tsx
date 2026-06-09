@@ -1,15 +1,16 @@
 import { useMemo, useState } from "react";
 import { buildCalendarMonthView, getMonthStart, shiftMonth } from "../lib/calendar";
-
-export type CalendarDayStatus = "partial" | "full";
+import { TOTAL_DAY_SLOTS } from "../lib/timeline";
+import type { PlannerCategory, PlannerSegmentsByDate } from "../store/plannerStore";
 
 type MonthlyWallCalendarProps = {
   onSelectDate?: (dateKey: string) => void;
   onPasteDate?: (dateKey: string) => void;
   onPasteWeekday?: (dateKeys: string[]) => void;
   selectedDateKey?: string | null;
-  dayStatusByDate?: Record<string, CalendarDayStatus>;
   canPasteTimeline?: boolean;
+  categories?: PlannerCategory[];
+  segmentsByDate?: PlannerSegmentsByDate;
 };
 
 /**
@@ -20,8 +21,9 @@ function MonthlyWallCalendar({
   onPasteDate,
   onPasteWeekday,
   selectedDateKey = null,
-  dayStatusByDate = {},
-  canPasteTimeline = false
+  canPasteTimeline = false,
+  categories = [],
+  segmentsByDate = {}
 }: MonthlyWallCalendarProps) {
   const [visibleMonth, setVisibleMonth] = useState<Date>(() => getMonthStart(new Date()));
 
@@ -47,6 +49,19 @@ function MonthlyWallCalendar({
     [monthView]
   );
 
+  const categoryColorById = useMemo(
+    () => new Map(categories.map((category) => [category.id, category.color])),
+    [categories]
+  );
+
+  function toPreviewFill(color: string): string {
+    if (/^#[0-9a-fA-F]{6}$/.test(color)) {
+      return `${color}66`;
+    }
+
+    return color;
+  }
+
   return (
     <section className="rounded-lg border border-app-border bg-app-surface p-4">
       <header className="mb-3 flex items-center justify-between gap-3 rounded-md border border-app-border bg-app-panel px-3 py-2">
@@ -70,22 +85,6 @@ function MonthlyWallCalendar({
           </button>
         </div>
       </header>
-
-      <div className="mb-3 flex items-center gap-3 text-xs text-app-muted">
-        <span className="font-semibold uppercase tracking-wide">Markers</span>
-        <span className="inline-flex items-center gap-1">
-          <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-amber-300 bg-amber-400/25 px-1 text-[0.62rem] font-bold text-amber-200">
-            P
-          </span>
-          Partial
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-sm border border-app-accent bg-app-accent/20 px-1 text-[0.62rem] font-bold text-app-accent">
-            F
-          </span>
-          Full
-        </span>
-      </div>
 
       <div className="overflow-x-auto">
         <div className="min-w-[46rem]">
@@ -113,13 +112,11 @@ function MonthlyWallCalendar({
 
           <div className="grid grid-cols-7 border-b border-l border-r border-app-border bg-app-surfaceStrong">
             {monthView.weeks.flat().map((cell) => {
-              const dayStatus = dayStatusByDate[cell.isoDate];
-              const statusLabel = dayStatus === "full"
-                ? "fully scheduled"
-                : dayStatus === "partial"
-                  ? "partially scheduled"
-                  : "no scheduled timeline data";
               const showPasteButton = cell.isCurrentMonth && onPasteDate !== undefined;
+              const previewSegments = cell.isCurrentMonth ? (segmentsByDate[cell.isoDate] ?? []) : [];
+              const statusLabel = previewSegments.length > 0
+                ? "scheduled timeline data present"
+                : "no scheduled timeline data";
 
               return (
                 <div
@@ -154,16 +151,27 @@ function MonthlyWallCalendar({
                   ) : null}
 
                   <span className="relative z-10 text-sm font-semibold">{cell.dayNumber}</span>
-                  {cell.isCurrentMonth && dayStatus ? (
-                    <span
-                      className={`absolute bottom-2 right-2 z-10 inline-flex h-4 min-w-4 items-center justify-center border px-1 text-[0.62rem] font-bold leading-none ${
-                        dayStatus === "full"
-                          ? "rounded-sm border-app-accent bg-app-accent/20 text-app-accent"
-                          : "rounded-full border-amber-300 bg-amber-400/25 text-amber-200"
-                      }`}
-                      aria-hidden="true"
-                    >
-                      {dayStatus === "full" ? "F" : "P"}
+
+                  {previewSegments.length > 0 ? (
+                    <span className="absolute inset-x-2 bottom-2 z-10 h-4 overflow-hidden rounded-sm border border-app-border bg-app-panel/45">
+                      {previewSegments.map((segment) => {
+                        const color = categoryColorById.get(segment.categoryId) ?? "#94a3b8";
+                        const startPercent = Math.max(0, Math.min(100, (segment.startSlot / TOTAL_DAY_SLOTS) * 100));
+                        const endPercent = Math.max(0, Math.min(100, (segment.endSlot / TOTAL_DAY_SLOTS) * 100));
+                        const widthPercent = Math.max(0, endPercent - startPercent);
+
+                        return (
+                          <span
+                            key={segment.id}
+                            className="absolute inset-y-0"
+                            style={{
+                              left: `${startPercent}%`,
+                              width: `${widthPercent}%`,
+                              backgroundColor: toPreviewFill(color)
+                            }}
+                          />
+                        );
+                      })}
                     </span>
                   ) : null}
                 </div>
