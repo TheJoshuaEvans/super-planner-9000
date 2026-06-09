@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useMealStore } from "../../store/mealStore";
 import type { MealComponent } from "../../store/mealStore";
 
@@ -21,6 +21,11 @@ function ComponentsPanel() {
   const addComponent = useMealStore((state) => state.addComponent);
   const updateComponent = useMealStore((state) => state.updateComponent);
   const deleteComponent = useMealStore((state) => state.deleteComponent);
+
+  const sortedComponents = useMemo(
+    () => [...components].sort((a, b) => a.name.localeCompare(b.name)),
+    [components]
+  );
 
   const [mode, setMode] = useState<PanelMode>("list");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -130,7 +135,7 @@ function ComponentsPanel() {
         </p>
       ) : (
         <ul className="space-y-2">
-          {components.map((component) => {
+          {sortedComponents.map((component) => {
             const isBeingEdited = mode === "edit" && editingId === component.id;
             return (
               <li
