@@ -1,6 +1,8 @@
 import { clampSlot } from "./timeline";
 import type { PlannerSegment } from "../store/plannerStore";
 
+export type TimelineCompleteness = "empty" | "partial" | "full";
+
 /**
  * Creates a lightweight unique identifier for planner segments.
  */
@@ -16,6 +18,55 @@ function cloneSegment(segment: PlannerSegment, overrides: Partial<PlannerSegment
     ...segment,
     ...overrides
   };
+}
+
+/**
+ * Classifies how fully a timeline is scheduled within the day's slot bounds.
+ */
+export function getTimelineCompleteness(
+  segments: PlannerSegment[],
+  totalDaySlots: number
+): TimelineCompleteness {
+  if (totalDaySlots <= 0 || segments.length === 0) {
+    return "empty";
+  }
+
+  const normalizedRanges = segments
+    .map((segment) => ({
+      startSlot: clampSlot(segment.startSlot),
+      endSlot: clampSlot(segment.endSlot)
+    }))
+    .filter((segment) => segment.endSlot > segment.startSlot)
+    .sort((left, right) => left.startSlot - right.startSlot);
+
+  if (normalizedRanges.length === 0) {
+    return "empty";
+  }
+
+  let coveredSlots = 0;
+  let rangeStart = normalizedRanges[0].startSlot;
+  let rangeEnd = normalizedRanges[0].endSlot;
+
+  for (let index = 1; index < normalizedRanges.length; index += 1) {
+    const next = normalizedRanges[index];
+
+    if (next.startSlot <= rangeEnd) {
+      rangeEnd = Math.max(rangeEnd, next.endSlot);
+      continue;
+    }
+
+    coveredSlots += rangeEnd - rangeStart;
+    rangeStart = next.startSlot;
+    rangeEnd = next.endSlot;
+  }
+
+  coveredSlots += rangeEnd - rangeStart;
+
+  if (coveredSlots <= 0) {
+    return "empty";
+  }
+
+  return coveredSlots >= totalDaySlots ? "full" : "partial";
 }
 
 /**

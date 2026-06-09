@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { applySegmentOverwrite, createSegment, moveSegment, pasteSegmentsWithOverwrite, resizeSegment } from "./plannerSegments";
+import {
+  applySegmentOverwrite,
+  createSegment,
+  getTimelineCompleteness,
+  moveSegment,
+  pasteSegmentsWithOverwrite,
+  resizeSegment
+} from "./plannerSegments";
 
 describe("plannerSegments", () => {
   it("creates a segment with expected fields", () => {
@@ -136,5 +143,35 @@ describe("plannerSegments", () => {
     expect(updated).toHaveLength(1);
     expect(updated[0].id).not.toBe("copy-1");
     expect(updated[0].id.startsWith("segment-")).toBe(true);
+  });
+
+  it("classifies an empty timeline as empty", () => {
+    expect(getTimelineCompleteness([], 96)).toBe("empty");
+  });
+
+  it("classifies a partially scheduled timeline as partial", () => {
+    expect(
+      getTimelineCompleteness([
+        { id: "a", categoryId: "work", startSlot: 8, endSlot: 24 }
+      ], 96)
+    ).toBe("partial");
+  });
+
+  it("classifies a fully covered timeline as full", () => {
+    expect(
+      getTimelineCompleteness([
+        { id: "a", categoryId: "sleep", startSlot: 0, endSlot: 40 },
+        { id: "b", categoryId: "work", startSlot: 40, endSlot: 96 }
+      ], 96)
+    ).toBe("full");
+  });
+
+  it("merges overlaps when determining completeness", () => {
+    expect(
+      getTimelineCompleteness([
+        { id: "a", categoryId: "work", startSlot: 0, endSlot: 70 },
+        { id: "b", categoryId: "play", startSlot: 50, endSlot: 96 }
+      ], 96)
+    ).toBe("full");
   });
 });

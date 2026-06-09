@@ -1,10 +1,13 @@
 import CategoryPalette from "./components/CategoryPalette";
+import type { CalendarDayStatus } from "./components/MonthlyWallCalendar";
 import MonthlyWallCalendar from "./components/MonthlyWallCalendar";
 import PortraitWarningOverlay from "./components/PortraitWarningOverlay";
 import TimelineTrack from "./components/TimelineTrack";
 import { formatCalendarDateLabel, getRelativeCalendarDateKey } from "./lib/calendar";
+import { getTimelineCompleteness } from "./lib/plannerSegments";
+import { TOTAL_DAY_SLOTS } from "./lib/timeline";
 import { usePlannerStore } from "./store/plannerStore";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { PlannerDateKey, PlannerSegment } from "./store/plannerStore";
 
 const PORTRAIT_WARNING_SESSION_KEY = "sp9000-portrait-warning-dismissed";
@@ -40,6 +43,17 @@ function App() {
   const canPasteTimeline = copiedTimelineSegments !== null;
   const selectedDateSegments = selectedDateKey ? (segmentsByDate[selectedDateKey] ?? []) : [];
   const selectedDateTitle = selectedDateKey ? formatCalendarDateLabel(selectedDateKey) : "";
+  const calendarDayStatusByDate = useMemo(() => {
+    return Object.entries(segmentsByDate).reduce<Record<PlannerDateKey, CalendarDayStatus>>((statusByDate, [dateKey, segments]) => {
+      const completeness = getTimelineCompleteness(segments, TOTAL_DAY_SLOTS);
+
+      if (completeness === "partial" || completeness === "full") {
+        statusByDate[dateKey] = completeness;
+      }
+
+      return statusByDate;
+    }, {});
+  }, [segmentsByDate]);
 
   /**
    * Commits a dragged category onto the timeline at the given slot range.
@@ -70,6 +84,19 @@ function App() {
     }
 
     pasteSegmentsForDate(dateKey, copiedTimelineSegments);
+  }
+
+  /**
+   * Pastes copied segments across a list of dates (for weekday-wide calendar actions).
+   */
+  function handlePasteAcrossDates(dateKeys: PlannerDateKey[]): void {
+    if (!copiedTimelineSegments) {
+      return;
+    }
+
+    dateKeys.forEach((dateKey) => {
+      pasteSegmentsForDate(dateKey, copiedTimelineSegments);
+    });
   }
 
   /**
@@ -155,7 +182,14 @@ function App() {
               onDeleteSegment={(segmentId) => deleteSegmentForDate(tomorrowDateKey, segmentId)}
             />
 
-            <MonthlyWallCalendar selectedDateKey={selectedDateKey} onSelectDate={setSelectedDateKey} />
+            <MonthlyWallCalendar
+              selectedDateKey={selectedDateKey}
+              onSelectDate={setSelectedDateKey}
+              onPasteDate={handlePasteTimeline}
+              onPasteWeekday={handlePasteAcrossDates}
+              dayStatusByDate={calendarDayStatusByDate}
+              canPasteTimeline={canPasteTimeline}
+            />
           </section>
         </section>
 

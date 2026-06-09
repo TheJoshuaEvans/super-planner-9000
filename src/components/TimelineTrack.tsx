@@ -305,10 +305,10 @@ function TimelineTrack({
 
           <button
             type="button"
-            className={`rounded-md border px-3 py-2 text-xs font-medium uppercase tracking-wide transition ${
+            className={`rounded-md border border-app-border bg-app-panel/85 px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-app-muted transition ${
               canPasteTimeline
-                ? "border-app-border bg-app-panel text-app-muted hover:border-app-accent/70 hover:text-app-text"
-                : "cursor-not-allowed border-app-bg bg-app-bg text-app-muted"
+                ? "hover:border-app-accent/70 hover:text-app-text"
+                : "cursor-not-allowed opacity-50"
             }`}
             onClick={onPasteTimeline}
             disabled={!canPasteTimeline}
