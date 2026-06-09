@@ -63,6 +63,25 @@ describe("plannerStore", () => {
     expect(reset.categories).toHaveLength(5);
   });
 
+  it("replaces planner data wholesale", () => {
+    const store = usePlannerStore.getState();
+    store.addCategoryForDate(DATE_A, "play", 0, 4);
+    store.addCategoryForDate(DATE_B, "travel", 8, 12);
+
+    store.replacePlannerData({
+      categories: [{ id: "custom", label: "Custom", color: "#111111" }],
+      segmentsByDate: {
+        "2026-06-11": [{ id: "replacement", categoryId: "custom", startSlot: 16, endSlot: 20 }]
+      }
+    });
+
+    const state = usePlannerStore.getState();
+    expect(state.categories).toEqual([{ id: "custom", label: "Custom", color: "#111111" }]);
+    expect(state.segmentsByDate).toEqual({
+      "2026-06-11": [{ id: "replacement", categoryId: "custom", startSlot: 16, endSlot: 20 }]
+    });
+  });
+
   it("adds a category for an arbitrary slot range", () => {
     usePlannerStore.getState().addCategoryForDate(DATE_A, "travel", 12, 20);
 

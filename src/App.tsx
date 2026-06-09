@@ -1,10 +1,17 @@
 import CategoryPalette from "./components/CategoryPalette";
 import MonthlyWallCalendar from "./components/MonthlyWallCalendar";
 import PortraitWarningOverlay from "./components/PortraitWarningOverlay";
+import ToastViewport from "./components/ToastViewport";
 import TimelineTrack from "./components/TimelineTrack";
-import { formatCalendarDateLabel, getRelativeCalendarDateKey } from "./lib/calendar";
+import { formatCalendarDateLabel, getRelativeCalendarDateKey, parseCalendarDateKey } from "./lib/calendar";
+import {
+  buildPlannerExportFilename,
+  parsePlannerDataImport,
+  serializePlannerDataExport
+} from "./lib/plannerDataIO";
 import { usePlannerStore } from "./store/plannerStore";
-import { useState } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
+import { useToastStore } from "./store/toastStore";
 import type { PlannerDateKey, PlannerSegment } from "./store/plannerStore";
 
 const PORTRAIT_WARNING_SESSION_KEY = "sp9000-portrait-warning-dismissed";
@@ -16,19 +23,21 @@ function App() {
   const categories = usePlannerStore((state) => state.categories);
   const segmentsByDate = usePlannerStore((state) => state.segmentsByDate);
   const addCategoryForDate = usePlannerStore((state) => state.addCategoryForDate);
+  const replacePlannerData = usePlannerStore((state) => state.replacePlannerData);
   const moveSegmentForDate = usePlannerStore((state) => state.moveSegmentForDate);
   const resizeSegmentForDate = usePlannerStore((state) => state.resizeSegmentForDate);
   const deleteSegmentForDate = usePlannerStore((state) => state.deleteSegmentForDate);
   const pasteSegmentsForDate = usePlannerStore((state) => state.pasteSegmentsForDate);
+  const showToast = useToastStore((state) => state.showToast);
 
   const todayDateKey = getRelativeCalendarDateKey(0);
   const tomorrowDateKey = getRelativeCalendarDateKey(1);
   const todaySegments = segmentsByDate[todayDateKey] ?? [];
   const tomorrowSegments = segmentsByDate[tomorrowDateKey] ?? [];
-  const totalScheduledBlocks = todaySegments.length + tomorrowSegments.length;
 
   const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
   const [copiedTimelineSegments, setCopiedTimelineSegments] = useState<PlannerSegment[] | null>(null);
+  const [copiedTimelineSourceDateKey, setCopiedTimelineSourceDateKey] = useState<PlannerDateKey | null>(null);
   const [selectedDateKey, setSelectedDateKey] = useState<PlannerDateKey | null>(null);
   const [isPortraitWarningDismissed, setIsPortraitWarningDismissed] = useState<boolean>(() => {
     if (typeof window === "undefined") {
@@ -37,9 +46,123 @@ function App() {
 
     return window.sessionStorage.getItem(PORTRAIT_WARNING_SESSION_KEY) === "true";
   });
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   const canPasteTimeline = copiedTimelineSegments !== null;
   const selectedDateSegments = selectedDateKey ? (segmentsByDate[selectedDateKey] ?? []) : [];
   const selectedDateTitle = selectedDateKey ? formatCalendarDateLabel(selectedDateKey) : "";
+
+  function formatDateKeyList(dateKeys: PlannerDateKey[]): string {
+    return dateKeys.map((dateKey) => formatCalendarDateLabel(dateKey)).join(", ");
+  }
+
+  function formatPasteTargetLabel(dateKeys: PlannerDateKey[]): string {
+    if (dateKeys.length === 1) {
+      return formatCalendarDateLabel(dateKeys[0]);
+    }
+
+    const parsedDates = dateKeys
+      .map((dateKey) => parseCalendarDateKey(dateKey))
+      .filter((date): date is Date => date !== null);
+
+    if (parsedDates.length === dateKeys.length) {
+      const weekdayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "long" });
+      const monthFormatter = new Intl.DateTimeFormat("en-US", { month: "long" });
+      const yearFormatter = new Intl.DateTimeFormat("en-US", { year: "numeric" });
+
+      const firstDate = parsedDates[0];
+      const weekdayName = weekdayFormatter.format(firstDate);
+      const monthName = monthFormatter.format(firstDate);
+      const yearLabel = yearFormatter.format(firstDate);
+      const allSameWeekday = parsedDates.every((date) => weekdayFormatter.format(date) === weekdayName);
+      const allSameMonth = parsedDates.every((date) => monthFormatter.format(date) === monthName);
+      const allSameYear = parsedDates.every((date) => yearFormatter.format(date) === yearLabel);
+
+      if (allSameWeekday && allSameMonth && allSameYear) {
+        return `${dateKeys.length} ${weekdayName}s in ${monthName} ${yearLabel}`;
+      }
+    }
+
+    return formatDateKeyList(dateKeys);
+  }
+
+  /**
+   * Exports the current planner state to a JSON file.
+   */
+  function handleExportPlannerData(): void {
+    const plannerState = usePlannerStore.getState();
+    const exportedJson = serializePlannerDataExport({
+      categories: plannerState.categories,
+      segmentsByDate: plannerState.segmentsByDate
+    });
+    const blob = new Blob([exportedJson], { type: "application/json;charset=utf-8" });
+    const downloadUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+
+    anchor.href = downloadUrl;
+    anchor.download = buildPlannerExportFilename();
+    anchor.rel = "noreferrer";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(downloadUrl);
+
+    showToast({
+      title: "Export downloaded",
+      message: `Saved as ${anchor.download}.`,
+      level: "success"
+    });
+  }
+
+  /**
+   * Opens the file picker for a planner import.
+   */
+  function handleImportButtonClick(): void {
+    importInputRef.current?.click();
+  }
+
+  /**
+   * Replaces the current planner data with the contents of a JSON import file.
+   */
+  async function handleImportFileChange(event: ChangeEvent<HTMLInputElement>): Promise<void> {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      const importText = await file.text();
+      const parsed = parsePlannerDataImport(importText);
+
+      if (!parsed.ok) {
+        showToast({
+          title: "Import failed",
+          message: parsed.error,
+          level: "error"
+        });
+        return;
+      }
+
+      replacePlannerData(parsed.data);
+      setSelectedDateKey(null);
+      setCopiedTimelineSegments(null);
+      setCopiedTimelineSourceDateKey(null);
+      setDraggingCategoryId(null);
+      showToast({
+        title: "Planner imported",
+        message: "The current planner state was replaced with the imported file.",
+        level: "success"
+      });
+    } catch {
+      showToast({
+        title: "Import failed",
+        message: "Could not read the selected file.",
+        level: "error"
+      });
+    } finally {
+      event.target.value = "";
+    }
+  }
 
   /**
    * Commits a dragged category onto the timeline at the given slot range.
@@ -59,6 +182,13 @@ function App() {
    */
   function handleCopyTimeline(dateKey: PlannerDateKey): void {
     setCopiedTimelineSegments((segmentsByDate[dateKey] ?? []).map((segment) => ({ ...segment })));
+    setCopiedTimelineSourceDateKey(dateKey);
+
+    showToast({
+      title: "Timeline copied",
+      message: `Copied ${formatCalendarDateLabel(dateKey)} to the clipboard.`,
+      level: "info"
+    });
   }
 
   /**
@@ -70,6 +200,20 @@ function App() {
     }
 
     pasteSegmentsForDate(dateKey, copiedTimelineSegments);
+
+    const sourceLabel = copiedTimelineSourceDateKey
+      ? formatCalendarDateLabel(copiedTimelineSourceDateKey)
+      : "the clipboard";
+    const targetLabel = formatPasteTargetLabel([dateKey]);
+    const message = copiedTimelineSourceDateKey === dateKey
+      ? `Reapplied the timeline for ${targetLabel}.`
+      : `Pasted the timeline from ${sourceLabel} into ${targetLabel}.`;
+
+    showToast({
+      title: "Timeline pasted",
+      message,
+      level: "success"
+    });
   }
 
   /**
@@ -82,6 +226,17 @@ function App() {
 
     dateKeys.forEach((dateKey) => {
       pasteSegmentsForDate(dateKey, copiedTimelineSegments);
+    });
+
+    const sourceLabel = copiedTimelineSourceDateKey
+      ? formatCalendarDateLabel(copiedTimelineSourceDateKey)
+      : "the clipboard";
+    const targetLabel = formatPasteTargetLabel(dateKeys);
+
+    showToast({
+      title: "Timeline pasted",
+      message: `Pasted the timeline from ${sourceLabel} into ${targetLabel}.`,
+      level: "success"
     });
   }
 
@@ -102,37 +257,57 @@ function App() {
 
   return (
     <>
+      <ToastViewport />
       <main
         className={`min-h-screen bg-app-bg px-4 py-5 text-app-text lg:px-6 lg:py-6 ${selectedDateKey ? "pb-[37rem] lg:pb-[39rem]" : "pb-32 lg:pb-36"} ${draggingCategoryId ? "cursor-grabbing" : ""}`}
         onPointerUp={() => setDraggingCategoryId(null)}
       >
         <section className="mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-[96rem] flex-col gap-5 rounded-lg bg-app-panel p-5 shadow-card lg:min-h-[calc(100vh-3rem)] lg:p-6">
-        <header className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <header className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
             <p className="text-sm font-medium uppercase tracking-[0.24em] text-app-muted">
               Daily Timeline Planner
             </p>
             <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Super Planner 9000</h1>
             <p className="max-w-3xl text-sm text-app-muted sm:text-base">
-              The day is modeled as a 24-hour number line split into 15-minute slots. This first implementation pass
-              establishes the landscape workspace, fixed category palette, and timeline grid that the drag-and-resize
-              editor will be built on.
+              Plan your day with draggable timeline blocks, copy and paste patterns across dates, and preview how each
+              calendar day is filling up at a glance. Today and tomorrow stay pinned up top, while any date you select
+              from the calendar opens in the docked editor below.
             </p>
           </div>
 
-          <div className="rounded-md border border-app-border bg-app-surface px-4 py-3 text-sm text-app-muted">
-            <p>
-              <span className="font-semibold text-app-text">Categories:</span> {categories.length}
-            </p>
-            <p>
-              <span className="font-semibold text-app-text">Scheduled blocks:</span> {totalScheduledBlocks}
-            </p>
+          <div className="flex flex-col items-start gap-2 lg:items-end">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleExportPlannerData}
+                className="rounded-md border border-app-border bg-app-panel/85 px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-app-muted transition hover:border-app-accent/70 hover:text-app-text"
+              >
+                Export
+              </button>
+              <button
+                type="button"
+                onClick={handleImportButtonClick}
+                className="rounded-md border border-app-border bg-app-panel/85 px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-app-muted transition hover:border-app-accent/70 hover:text-app-text"
+              >
+                Import
+              </button>
+            </div>
+
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={handleImportFileChange}
+            />
           </div>
         </header>
 
           <section className="flex flex-1 flex-col gap-5">
             <TimelineTrack
               title="Today"
+              subtitle={formatCalendarDateLabel(todayDateKey)}
               categories={categories}
               segments={todaySegments}
               canPasteTimeline={canPasteTimeline}
@@ -152,6 +327,7 @@ function App() {
 
             <TimelineTrack
               title="Tomorrow"
+              subtitle={formatCalendarDateLabel(tomorrowDateKey)}
               categories={categories}
               segments={tomorrowSegments}
               canPasteTimeline={canPasteTimeline}

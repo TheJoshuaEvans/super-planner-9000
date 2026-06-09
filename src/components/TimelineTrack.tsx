@@ -16,6 +16,7 @@ import Tooltip from "./Tooltip";
 
 type TimelineTrackProps = {
   title: string;
+  subtitle?: string;
   categories: PlannerCategory[];
   segments: PlannerSegment[];
   canPasteTimeline: boolean;
@@ -106,6 +107,7 @@ function isPointerInElement(clientX: number, clientY: number, element: HTMLEleme
  */
 function TimelineTrack({
   title,
+  subtitle,
   categories,
   segments,
   canPasteTimeline,
@@ -292,7 +294,7 @@ function TimelineTrack({
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold">{title}</h2>
-          <p className="text-sm text-app-muted">0-24 timeline at 15-minute resolution</p>
+          <p className="text-sm text-app-muted">{subtitle ?? "0-24 timeline at 15-minute resolution"}</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -425,42 +427,44 @@ function TimelineTrack({
                     const segmentLabel = category?.label ?? segment.categoryId;
                     const segmentTimeRangeLabel = formatSlotRangeLabelMeridiem(segment.startSlot, segment.endSlot);
                     const segmentDurationLabel = formatSlotDurationLabel(segment.startSlot, segment.endSlot);
+                    const isMinimumSizeSegment = segment.endSlot - segment.startSlot <= 1;
+                    const resizeHandleWidthClass = isMinimumSizeSegment ? "w-2" : "w-3";
 
                     return (
-                      <div
+                      <Tooltip
                         key={segment.id}
-                        className={`absolute inset-y-0 flex min-w-0 select-none flex-col justify-between overflow-visible rounded-md border border-black/20 text-white shadow-sm ${isActive ? "ring-2 ring-app-accent/60" : ""}`}
-                        style={{
+                        content={`${segmentLabel} • ${segmentTimeRangeLabel} • ${segmentDurationLabel}`}
+                        triggerClassName={`!absolute inset-y-0 flex min-w-0 select-none flex-col justify-between overflow-visible rounded-md border border-black/20 text-white shadow-sm ${isActive ? "ring-2 ring-app-accent/60" : ""}`}
+                        triggerStyle={{
                           left,
                           width,
                           backgroundColor: category?.color ?? "#475569",
                           zIndex: isActive ? 10 : 1
                         }}
+                        boundaryRef={trackRef}
                       >
                         {/* Left resize handle */}
                         <div
-                          className="absolute inset-y-0 left-0 z-10 w-3 cursor-ew-resize rounded-l-md hover:bg-black/20"
+                          className={`absolute inset-y-0 left-0 z-10 cursor-ew-resize rounded-l-md hover:bg-black/20 ${resizeHandleWidthClass}`}
                           onPointerDown={(event) => handleLeftHandlePointerDown(event, segment)}
                         />
 
                         {/* Block body (move handle) */}
-                        <Tooltip content={`${segmentLabel} • ${segmentTimeRangeLabel} • ${segmentDurationLabel}`} triggerClassName="absolute inset-y-0 left-3 right-3 block h-full w-full">
-                          <div
-                            className={`flex h-full w-full flex-col justify-start gap-0.5 overflow-hidden px-1 py-2 ${isActive && interaction?.mode === "move" ? "cursor-grabbing" : "cursor-grab"}`}
-                            onPointerDown={(event) => handleBodyPointerDown(event, segment)}
-                          >
-                            <span className="truncate text-sm font-semibold">{segmentLabel}</span>
-                            <span className="truncate text-xs text-white/85">{segmentTimeRangeLabel}</span>
-                            <span className="truncate text-[11px] text-white/70">{segmentDurationLabel}</span>
-                          </div>
-                        </Tooltip>
+                        <div
+                          className={`flex h-full w-full flex-col justify-start gap-0.5 overflow-hidden pl-1 pr-3 py-2 ${isActive && interaction?.mode === "move" ? "cursor-grabbing" : "cursor-grab"}`}
+                          onPointerDown={(event) => handleBodyPointerDown(event, segment)}
+                        >
+                          <span className="truncate text-sm font-semibold">{segmentLabel}</span>
+                          <span className="truncate text-xs text-white/85">{segmentTimeRangeLabel}</span>
+                          <span className="truncate text-[11px] text-white/70">{segmentDurationLabel}</span>
+                        </div>
 
                         {/* Right resize handle */}
                         <div
-                          className="absolute inset-y-0 right-0 z-10 w-3 cursor-ew-resize rounded-r-md hover:bg-black/20"
+                          className={`absolute inset-y-0 right-0 z-10 cursor-ew-resize rounded-r-md hover:bg-black/20 ${resizeHandleWidthClass}`}
                           onPointerDown={(event) => handleRightHandlePointerDown(event, segment)}
                         />
-                      </div>
+                      </Tooltip>
                     );
                   })}
 

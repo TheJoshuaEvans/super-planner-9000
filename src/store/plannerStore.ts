@@ -30,12 +30,17 @@ export type PlannerDateKey = string;
 export type PlannerSegmentsByDate = Record<PlannerDateKey, PlannerSegment[]>;
 
 /**
- * Persisted planner data for the current single-day editor.
+ * Persisted planner data that should be exported/imported as a unit.
  */
-type PlannerState = {
+export type PlannerPersistedData = {
   categories: PlannerCategory[];
   segmentsByDate: PlannerSegmentsByDate;
 };
+
+/**
+ * Persisted planner data for the current single-day editor.
+ */
+type PlannerState = PlannerPersistedData;
 
 /**
  * Planner state plus the actions exposed to the UI.
@@ -75,6 +80,11 @@ type PlannerStore = PlannerState & {
     * Removes all scheduled segments for the selected date.
    */
     clearSegmentsForDate: (dateKey: PlannerDateKey) => void;
+
+  /**
+   * Restores the planner to its default categories and empty timeline.
+   */
+  replacePlannerData: (data: PlannerPersistedData) => void;
 
   /**
    * Restores the planner to its default categories and empty timeline.
@@ -169,6 +179,11 @@ export const usePlannerStore = create<PlannerStore>()(
             ...state.segmentsByDate,
             [dateKey]: []
           }
+        })),
+      replacePlannerData: (data) =>
+        set(() => ({
+          categories: data.categories,
+          segmentsByDate: data.segmentsByDate
         })),
       resetPlanner: () => set({ ...initialState })
     }),
