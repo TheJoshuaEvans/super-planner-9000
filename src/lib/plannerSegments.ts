@@ -1,3 +1,4 @@
+import { clampSlot } from "./timeline";
 import type { PlannerSegment } from "../store/plannerStore";
 
 /**
@@ -64,4 +65,66 @@ export function createSegment(categoryId: string, startSlot: number, endSlot: nu
     startSlot,
     endSlot
   };
+}
+/**
+ * Resizes an existing segment to a new slot range, clamping to day bounds and
+ * enforcing a minimum duration of one slot. Overwrites any newly overlapping segments.
+ */
+export function resizeSegment(
+  existingSegments: PlannerSegment[],
+  segmentId: string,
+  nextStartSlot: number,
+  nextEndSlot: number,
+  totalDaySlots: number
+): PlannerSegment[] {
+  const MIN_SLOTS = 1;
+
+  const original = existingSegments.find((segment) => segment.id === segmentId);
+
+  if (!original) {
+    return existingSegments;
+  }
+
+  const clampedStart = Math.max(0, Math.min(nextStartSlot, totalDaySlots - MIN_SLOTS));
+  const clampedEnd = Math.max(clampedStart + MIN_SLOTS, Math.min(nextEndSlot, totalDaySlots));
+
+  if (clampedEnd <= clampedStart) {
+    return existingSegments;
+  }
+
+  const resized = cloneSegment(original, { startSlot: clampedStart, endSlot: clampedEnd });
+  const remaining = existingSegments.filter((segment) => segment.id !== segmentId);
+  return applySegmentOverwrite(remaining, resized);
+}
+
+/**
+ * Moves an existing segment to a new start slot while preserving duration.
+ */
+export function moveSegment(
+  existingSegments: PlannerSegment[],
+  segmentId: string,
+  nextStartSlot: number,
+  totalDaySlots: number
+): PlannerSegment[] {
+  const segmentToMove = existingSegments.find((segment) => segment.id === segmentId);
+
+  if (!segmentToMove) {
+    return existingSegments;
+  }
+
+  const duration = segmentToMove.endSlot - segmentToMove.startSlot;
+
+  if (duration <= 0) {
+    return existingSegments;
+  }
+
+  const maxStart = Math.max(0, totalDaySlots - duration);
+  const clampedStart = Math.min(maxStart, Math.max(0, clampSlot(nextStartSlot)));
+  const movedSegment = cloneSegment(segmentToMove, {
+    startSlot: clampedStart,
+    endSlot: clampedStart + duration
+  });
+
+  const remainingSegments = existingSegments.filter((segment) => segment.id !== segmentId);
+  return applySegmentOverwrite(remainingSegments, movedSegment);
 }

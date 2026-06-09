@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { createSegment, applySegmentOverwrite } from "../lib/plannerSegments";
-import { DEFAULT_SEGMENT_DURATION_SLOTS } from "../lib/timeline";
+import { applySegmentOverwrite, createSegment, moveSegment, resizeSegment } from "../lib/plannerSegments";
+import { TOTAL_DAY_SLOTS } from "../lib/timeline";
 
 /**
  * Fixed category metadata used to label and color timeline segments.
@@ -23,11 +23,21 @@ export type PlannerSegment = {
 };
 
 /**
+ * Supported day buckets for the timeline editor.
+ */
+export type PlannerDayKey = "today" | "tomorrow";
+
+/**
+ * Per-day segment state map for the planner.
+ */
+export type PlannerSegmentsByDay = Record<PlannerDayKey, PlannerSegment[]>;
+
+/**
  * Persisted planner data for the current single-day editor.
  */
 type PlannerState = {
   categories: PlannerCategory[];
-  segments: PlannerSegment[];
+  segmentsByDay: PlannerSegmentsByDay;
 };
 
 /**
@@ -35,19 +45,34 @@ type PlannerState = {
  */
 type PlannerStore = PlannerState & {
   /**
-   * Replaces the full segment list.
+    * Replaces the full segment list for a given day.
    */
-  setSegments: (segments: PlannerSegment[]) => void;
+    setSegments: (dayKey: PlannerDayKey, segments: PlannerSegment[]) => void;
 
   /**
-   * Places a category block into the first hour, overwriting any existing time there.
+    * Adds a category block over the given slot range for a day, overwriting any overlapping time.
    */
-  addCategoryToFirstHour: (categoryId: string) => void;
+    addCategory: (dayKey: PlannerDayKey, categoryId: string, startSlot: number, endSlot: number) => void;
 
   /**
-   * Removes all scheduled segments from the day.
+    * Moves an existing segment for a day to a new start slot while keeping its duration.
    */
-  clearSegments: () => void;
+    moveSegment: (dayKey: PlannerDayKey, segmentId: string, nextStartSlot: number) => void;
+
+  /**
+    * Resizes an existing segment for a day to a new slot range, enforcing a 15-minute minimum.
+   */
+    resizeSegment: (dayKey: PlannerDayKey, segmentId: string, nextStartSlot: number, nextEndSlot: number) => void;
+
+  /**
+    * Deletes a segment from the chosen day timeline.
+   */
+    deleteSegment: (dayKey: PlannerDayKey, segmentId: string) => void;
+
+  /**
+    * Removes all scheduled segments for the chosen day.
+   */
+    clearSegments: (dayKey: PlannerDayKey) => void;
 
   /**
    * Restores the planner to its default categories and empty timeline.
@@ -71,7 +96,10 @@ const defaultCategories: PlannerCategory[] = [
  */
 const initialState: PlannerState = {
   categories: defaultCategories,
-  segments: []
+  segmentsByDay: {
+    today: [],
+    tomorrow: []
+  }
 };
 
 /**
@@ -81,15 +109,54 @@ export const usePlannerStore = create<PlannerStore>()(
   persist(
     (set) => ({
       ...initialState,
-      setSegments: (segments) => set({ segments }),
-      addCategoryToFirstHour: (categoryId) =>
+      setSegments: (dayKey, segments) =>
         set((state) => ({
-          segments: applySegmentOverwrite(
-            state.segments,
-            createSegment(categoryId, 0, DEFAULT_SEGMENT_DURATION_SLOTS)
-          )
+          segmentsByDay: {
+            ...state.segmentsByDay,
+            [dayKey]: segments
+          }
         })),
-      clearSegments: () => set({ segments: [] }),
+      addCategory: (dayKey, categoryId, startSlot, endSlot) =>
+        set((state) => ({
+          segmentsByDay:
+            endSlot <= startSlot
+              ? state.segmentsByDay
+              : {
+                  ...state.segmentsByDay,
+                  [dayKey]: applySegmentOverwrite(
+                    state.segmentsByDay[dayKey],
+                    createSegment(categoryId, startSlot, endSlot)
+                  )
+                }
+        })),
+      moveSegment: (dayKey, segmentId, nextStartSlot) =>
+        set((state) => ({
+          segmentsByDay: {
+            ...state.segmentsByDay,
+            [dayKey]: moveSegment(state.segmentsByDay[dayKey], segmentId, nextStartSlot, TOTAL_DAY_SLOTS)
+          }
+        })),
+      resizeSegment: (dayKey, segmentId, nextStartSlot, nextEndSlot) =>
+        set((state) => ({
+          segmentsByDay: {
+            ...state.segmentsByDay,
+            [dayKey]: resizeSegment(state.segmentsByDay[dayKey], segmentId, nextStartSlot, nextEndSlot, TOTAL_DAY_SLOTS)
+          }
+        })),
+      deleteSegment: (dayKey, segmentId) =>
+        set((state) => ({
+          segmentsByDay: {
+            ...state.segmentsByDay,
+            [dayKey]: state.segmentsByDay[dayKey].filter((segment) => segment.id !== segmentId)
+          }
+        })),
+      clearSegments: (dayKey) =>
+        set((state) => ({
+          segmentsByDay: {
+            ...state.segmentsByDay,
+            [dayKey]: []
+          }
+        })),
       resetPlanner: () => set({ ...initialState })
     }),
     {
@@ -97,7 +164,7 @@ export const usePlannerStore = create<PlannerStore>()(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         categories: state.categories,
-        segments: state.segments
+        segmentsByDay: state.segmentsByDay
       })
     }
   )

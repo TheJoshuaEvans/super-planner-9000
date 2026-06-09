@@ -1,17 +1,40 @@
 import CategoryPalette from "./components/CategoryPalette";
 import TimelineTrack from "./components/TimelineTrack";
 import { usePlannerStore } from "./store/plannerStore";
+import { useState } from "react";
 
 /**
  * Composes the planner page shell from the timeline track and category palette.
  */
 function App() {
   const categories = usePlannerStore((state) => state.categories);
-  const segments = usePlannerStore((state) => state.segments);
-  const addCategoryToFirstHour = usePlannerStore((state) => state.addCategoryToFirstHour);
+  const segmentsByDay = usePlannerStore((state) => state.segmentsByDay);
+  const addCategory = usePlannerStore((state) => state.addCategory);
+  const moveSegment = usePlannerStore((state) => state.moveSegment);
+  const resizeSegment = usePlannerStore((state) => state.resizeSegment);
+  const deleteSegment = usePlannerStore((state) => state.deleteSegment);
+  const totalScheduledBlocks = segmentsByDay.today.length + segmentsByDay.tomorrow.length;
+
+  const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
+
+  /**
+   * Commits a dragged category onto the timeline at the given slot range.
+   */
+  function handleDropCategory(
+    dayKey: "today" | "tomorrow",
+    categoryId: string,
+    startSlot: number,
+    endSlot: number
+  ): void {
+    addCategory(dayKey, categoryId, startSlot, endSlot);
+    setDraggingCategoryId(null);
+  }
 
   return (
-    <main className="min-h-screen bg-app-bg text-app-text px-4 py-5 lg:px-6 lg:py-6">
+    <main
+      className={`min-h-screen bg-app-bg px-4 py-5 pb-32 text-app-text lg:px-6 lg:py-6 lg:pb-36 ${draggingCategoryId ? "cursor-grabbing" : ""}`}
+      onPointerUp={() => setDraggingCategoryId(null)}
+    >
       <section className="mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-[96rem] flex-col gap-5 rounded-lg bg-app-panel p-5 shadow-card lg:min-h-[calc(100vh-3rem)] lg:p-6">
         <header className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-2">
@@ -31,15 +54,53 @@ function App() {
               <span className="font-semibold text-app-text">Categories:</span> {categories.length}
             </p>
             <p>
-              <span className="font-semibold text-app-text">Scheduled blocks:</span> {segments.length}
+              <span className="font-semibold text-app-text">Scheduled blocks:</span> {totalScheduledBlocks}
             </p>
           </div>
         </header>
 
         <section className="flex flex-1 flex-col gap-5">
-          <TimelineTrack categories={categories} segments={segments} />
-          <CategoryPalette categories={categories} onCategoryPress={addCategoryToFirstHour} />
+          <TimelineTrack
+            title="Today"
+            categories={categories}
+            segments={segmentsByDay.today}
+            onMoveSegment={(segmentId, nextStartSlot) => moveSegment("today", segmentId, nextStartSlot)}
+            onResizeSegment={(segmentId, nextStartSlot, nextEndSlot) =>
+              resizeSegment("today", segmentId, nextStartSlot, nextEndSlot)
+            }
+            draggingCategoryId={draggingCategoryId}
+            onDropCategory={(categoryId, startSlot, endSlot) =>
+              handleDropCategory("today", categoryId, startSlot, endSlot)
+            }
+            onDeleteSegment={(segmentId) => deleteSegment("today", segmentId)}
+            showCurrentTimeMarker
+          />
+
+          <TimelineTrack
+            title="Tomorrow"
+            categories={categories}
+            segments={segmentsByDay.tomorrow}
+            onMoveSegment={(segmentId, nextStartSlot) => moveSegment("tomorrow", segmentId, nextStartSlot)}
+            onResizeSegment={(segmentId, nextStartSlot, nextEndSlot) =>
+              resizeSegment("tomorrow", segmentId, nextStartSlot, nextEndSlot)
+            }
+            draggingCategoryId={draggingCategoryId}
+            onDropCategory={(categoryId, startSlot, endSlot) =>
+              handleDropCategory("tomorrow", categoryId, startSlot, endSlot)
+            }
+            onDeleteSegment={(segmentId) => deleteSegment("tomorrow", segmentId)}
+          />
         </section>
+      </section>
+
+      <section className="fixed inset-x-0 bottom-0 z-50 px-4 pb-4 lg:px-6 lg:pb-5">
+        <div className="mx-auto w-full max-w-[96rem] rounded-lg border border-app-border bg-app-surface/95 p-4 shadow-card backdrop-blur">
+          <CategoryPalette
+            categories={categories}
+            draggingCategoryId={draggingCategoryId}
+            onCategoryDragStart={setDraggingCategoryId}
+          />
+        </div>
       </section>
     </main>
   );

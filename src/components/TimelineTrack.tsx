@@ -1,83 +1,470 @@
-import { formatHourLabel, formatSlotRangeLabel, hourMarks, quarterHourMarks, TOTAL_DAY_SLOTS } from "../lib/timeline";
+import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
+import {
+  clientXToSlot,
+  DEFAULT_SEGMENT_DURATION_SLOTS,
+  formatClockTimeLabel,
+  formatSlotDurationLabel,
+  formatHourLabel,
+  formatSlotRangeLabelMeridiem,
+  hourMarks,
+  quarterHourMarks,
+  snapSlot,
+  TOTAL_DAY_SLOTS
+} from "../lib/timeline";
 import type { PlannerCategory, PlannerSegment } from "../store/plannerStore";
+import Tooltip from "./Tooltip";
 
 type TimelineTrackProps = {
+  title: string;
   categories: PlannerCategory[];
   segments: PlannerSegment[];
+  draggingCategoryId: string | null;
+  onMoveSegment: (segmentId: string, nextStartSlot: number) => void;
+  onResizeSegment: (segmentId: string, nextStartSlot: number, nextEndSlot: number) => void;
+  onDropCategory: (categoryId: string, startSlot: number, endSlot: number) => void;
+  onDeleteSegment: (segmentId: string) => void;
+  footer?: ReactNode;
+  showCurrentTimeMarker?: boolean;
 };
+
+type MoveInteraction = {
+  mode: "move";
+  segmentId: string;
+  duration: number;
+  grabOffsetSlots: number;
+  previewStartSlot: number;
+};
+
+type ResizeInteraction = {
+  mode: "resize-left" | "resize-right";
+  segmentId: string;
+  fixedStartSlot: number;
+  fixedEndSlot: number;
+  previewStartSlot: number;
+  previewEndSlot: number;
+};
+
+type InteractionState = MoveInteraction | ResizeInteraction;
+
+const MIN_RESIZE_SLOTS = 1;
+
+/**
+ * Maps the current local wall-clock time into the timeline's 15-minute-slot domain.
+ */
+function resolveCurrentTimeSlot(currentTime: Date): number {
+  const dayFraction = currentTime.getHours() + currentTime.getMinutes() / 60 + currentTime.getSeconds() / 3600;
+  return Math.max(0, Math.min(TOTAL_DAY_SLOTS, (dayFraction / 24) * TOTAL_DAY_SLOTS));
+}
+
+/**
+ * Resolves the clamped start slot for a move interaction from a pointer position.
+ */
+function resolveMoveStart(clientX: number, interaction: MoveInteraction, trackEl: HTMLDivElement): number {
+  const rect = trackEl.getBoundingClientRect();
+  const raw = snapSlot(clientXToSlot(clientX, rect.left, rect.width)) - interaction.grabOffsetSlots;
+  const max = TOTAL_DAY_SLOTS - interaction.duration;
+  return Math.max(0, Math.min(max, raw));
+}
+
+/**
+ * Resolves the preview slot range for a resize interaction from a pointer position.
+ */
+function resolveResizeRange(
+  clientX: number,
+  interaction: ResizeInteraction,
+  trackEl: HTMLDivElement
+): { startSlot: number; endSlot: number } {
+  const rect = trackEl.getBoundingClientRect();
+  const slot = snapSlot(clientXToSlot(clientX, rect.left, rect.width));
+
+  if (interaction.mode === "resize-left") {
+    const start = Math.max(0, Math.min(slot, interaction.fixedEndSlot - MIN_RESIZE_SLOTS));
+    return { startSlot: start, endSlot: interaction.fixedEndSlot };
+  } else {
+    const end = Math.min(TOTAL_DAY_SLOTS, Math.max(slot, interaction.fixedStartSlot + MIN_RESIZE_SLOTS));
+    return { startSlot: interaction.fixedStartSlot, endSlot: end };
+  }
+}
+
+/**
+ * Returns true when the pointer coordinate is inside the given element bounds.
+ */
+function isPointerInElement(clientX: number, clientY: number, element: HTMLElement | null): boolean {
+  if (!element) {
+    return false;
+  }
+
+  const rect = element.getBoundingClientRect();
+  return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+}
 
 /**
  * Renders the day timeline grid and any scheduled segments placed on it.
  */
-function TimelineTrack({ categories, segments }: TimelineTrackProps) {
-  const categoriesById = new Map(categories.map((category) => [category.id, category]));
+function TimelineTrack({
+  title,
+  categories,
+  segments,
+  draggingCategoryId,
+  onMoveSegment,
+  onResizeSegment,
+  onDropCategory,
+  onDeleteSegment,
+  footer,
+  showCurrentTimeMarker = false
+}: TimelineTrackProps) {
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const trashRef = useRef<HTMLDivElement | null>(null);
+  const [interaction, setInteraction] = useState<InteractionState | null>(null);
+  const [dropPreviewSlot, setDropPreviewSlot] = useState<number | null>(null);
+  const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
+  const [isTrashHot, setIsTrashHot] = useState(false);
+
+  useEffect(() => {
+    if (!showCurrentTimeMarker) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setCurrentTime(new Date());
+    }, 30_000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [showCurrentTimeMarker]);
+
+  const categoriesById = useMemo(
+    () => new Map(categories.map((category) => [category.id, category])),
+    [categories]
+  );
+  const currentTimePercent = useMemo(
+    () => Math.max(0, Math.min(100, (resolveCurrentTimeSlot(currentTime) / TOTAL_DAY_SLOTS) * 100)),
+    [currentTime]
+  );
+  const currentTimeLabel = useMemo(
+    () => formatClockTimeLabel(currentTime),
+    [currentTime]
+  );
+
+  const visibleSegments = useMemo(() => {
+    if (!interaction) {
+      return segments;
+    }
+
+    return segments.map((segment) => {
+      if (segment.id !== interaction.segmentId) {
+        return segment;
+      }
+
+      if (interaction.mode === "move") {
+        return { ...segment, startSlot: interaction.previewStartSlot, endSlot: interaction.previewStartSlot + interaction.duration };
+      }
+
+      return { ...segment, startSlot: interaction.previewStartSlot, endSlot: interaction.previewEndSlot };
+    });
+  }, [interaction, segments]);
+
+  /**
+   * Starts a body-move interaction, recording the grab offset inside the block.
+   */
+  function handleBodyPointerDown(event: PointerEvent<HTMLDivElement>, segment: PlannerSegment): void {
+    if (!trackRef.current) return;
+    event.stopPropagation();
+    const rect = trackRef.current.getBoundingClientRect();
+    const grabSlot = snapSlot(clientXToSlot(event.clientX, rect.left, rect.width));
+    setInteraction({
+      mode: "move",
+      segmentId: segment.id,
+      duration: segment.endSlot - segment.startSlot,
+      grabOffsetSlots: grabSlot - segment.startSlot,
+      previewStartSlot: segment.startSlot
+    });
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  /**
+   * Starts a left-edge resize interaction.
+   */
+  function handleLeftHandlePointerDown(event: PointerEvent<HTMLDivElement>, segment: PlannerSegment): void {
+    event.stopPropagation();
+    setInteraction({
+      mode: "resize-left",
+      segmentId: segment.id,
+      fixedStartSlot: segment.startSlot,
+      fixedEndSlot: segment.endSlot,
+      previewStartSlot: segment.startSlot,
+      previewEndSlot: segment.endSlot
+    });
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  /**
+   * Starts a right-edge resize interaction.
+   */
+  function handleRightHandlePointerDown(event: PointerEvent<HTMLDivElement>, segment: PlannerSegment): void {
+    event.stopPropagation();
+    setInteraction({
+      mode: "resize-right",
+      segmentId: segment.id,
+      fixedStartSlot: segment.startSlot,
+      fixedEndSlot: segment.endSlot,
+      previewStartSlot: segment.startSlot,
+      previewEndSlot: segment.endSlot
+    });
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  /**
+   * Updates the preview position for whichever interaction is currently active.
+   * Also tracks drop preview position when a category is being dragged in from the palette.
+   */
+  function handleTrackPointerMove(event: PointerEvent<HTMLDivElement>): void {
+    if (!trackRef.current) return;
+
+    if (draggingCategoryId) {
+      const slot = snapSlot(clientXToSlot(event.clientX, trackRef.current.getBoundingClientRect().left, trackRef.current.getBoundingClientRect().width));
+      const clamped = Math.min(slot, TOTAL_DAY_SLOTS - DEFAULT_SEGMENT_DURATION_SLOTS);
+      setDropPreviewSlot(Math.max(0, clamped));
+      return;
+    }
+
+    if (!interaction) return;
+
+    if (interaction.mode === "move") {
+      const nextStart = resolveMoveStart(event.clientX, interaction, trackRef.current);
+      setIsTrashHot(isPointerInElement(event.clientX, event.clientY, trashRef.current));
+      setInteraction((prev) => prev ? { ...prev, previewStartSlot: nextStart } as MoveInteraction : prev);
+    } else {
+      const { startSlot, endSlot } = resolveResizeRange(event.clientX, interaction, trackRef.current);
+      setIsTrashHot(false);
+      setInteraction((prev) => prev ? { ...prev, previewStartSlot: startSlot, previewEndSlot: endSlot } as ResizeInteraction : prev);
+    }
+  }
+
+  /**
+   * Commits the current interaction to the store and clears local state.
+   * If a category is being dragged in, commits it as a new block at the drop position.
+   */
+  function handleTrackPointerUp(event: PointerEvent<HTMLDivElement>): void {
+    if (draggingCategoryId && dropPreviewSlot !== null) {
+      onDropCategory(draggingCategoryId, dropPreviewSlot, dropPreviewSlot + DEFAULT_SEGMENT_DURATION_SLOTS);
+      setDropPreviewSlot(null);
+      return;
+    }
+
+    if (!interaction) return;
+
+    if (interaction.mode === "move" && isPointerInElement(event.clientX, event.clientY, trashRef.current)) {
+      onDeleteSegment(interaction.segmentId);
+      setInteraction(null);
+      setIsTrashHot(false);
+      return;
+    }
+
+    if (interaction.mode === "move") {
+      onMoveSegment(interaction.segmentId, interaction.previewStartSlot);
+    } else {
+      onResizeSegment(interaction.segmentId, interaction.previewStartSlot, interaction.previewEndSlot);
+    }
+
+    setInteraction(null);
+    setIsTrashHot(false);
+  }
+
+  /**
+   * Cancels the current interaction without committing changes.
+   */
+  function handleTrackPointerCancel(): void {
+    setInteraction(null);
+    setDropPreviewSlot(null);
+    setIsTrashHot(false);
+  }
 
   return (
-    <section className="flex min-h-[26rem] flex-col gap-4 rounded-lg border border-app-border bg-app-surface p-4">
+    <section className="flex flex-col gap-4 rounded-lg border border-app-border bg-app-surface p-4">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold">Today</h2>
+          <h2 className="text-lg font-semibold">{title}</h2>
           <p className="text-sm text-app-muted">0-24 timeline at 15-minute resolution</p>
         </div>
-        <div className="text-sm text-app-muted">{TOTAL_DAY_SLOTS} slots total</div>
+        <div
+          ref={trashRef}
+          className={`pointer-events-none flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium uppercase tracking-wide transition ${
+            isTrashHot
+              ? "border-red-400/80 bg-red-500/20 text-red-200"
+              : "border-app-border bg-app-panel text-app-muted"
+          }`}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9">
+            <path d="M4 7h16" strokeLinecap="round" />
+            <path d="M9 7V5.5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5.5V7" strokeLinecap="round" />
+            <path d="M7.5 7l.7 11a2 2 0 0 0 2 1.9h3.6a2 2 0 0 0 2-1.9l.7-11" strokeLinecap="round" />
+            <path d="M10 11v5M14 11v5" strokeLinecap="round" />
+          </svg>
+          <span className="relative inline-block w-[8.75rem] text-left">
+            <span className={`transition-opacity ${isTrashHot ? "opacity-0" : "opacity-100"}`}>Drag here to delete</span>
+            <span className={`absolute inset-0 transition-opacity ${isTrashHot ? "opacity-100" : "opacity-0"}`}>Release to delete</span>
+          </span>
+        </div>
       </div>
 
       <div className="overflow-x-auto pb-2">
-        <div className="min-w-[72rem] space-y-3">
-          <div className="relative grid grid-cols-24 gap-0 text-xs text-app-muted">
-            {hourMarks.map((hour) => (
-              <div key={hour} className="-translate-x-1/2">
-                {formatHourLabel(hour)}
-              </div>
-            ))}
+        <div className="min-w-[72rem] space-y-2">
+          <div className="h-4 px-3 text-[11px] leading-none text-app-muted">
+            <div className="relative h-full">
+              {hourMarks.map((hour) => {
+                const isFirst = hour === 0;
+                const isLast = hour === TOTAL_DAY_SLOTS / 4;
+                const left = `${(hour / (TOTAL_DAY_SLOTS / 4)) * 100}%`;
+
+                return (
+                  <span
+                    key={hour}
+                    className={`absolute top-0 ${isFirst ? "left-0 translate-x-0" : isLast ? "-translate-x-full" : "-translate-x-1/2"}`}
+                    style={{ left: isLast ? "100%" : left }}
+                  >
+                    {formatHourLabel(hour)}
+                  </span>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="relative h-48 rounded-lg border border-app-border bg-app-panel">
-            <div className="absolute inset-0 grid grid-cols-96 overflow-hidden rounded-lg">
+          <div className="px-3">
+            <div
+              className="h-2 rounded-full border-[0.5px] border-app-border/65"
+              style={{
+                backgroundImage:
+                  "repeating-linear-gradient(to right, rgba(154,176,197,0.25) 0, rgba(154,176,197,0.25) 1.5px, transparent 1.5px, transparent calc(100% / 96)), repeating-linear-gradient(to right, rgba(237,246,255,0.55) 0, rgba(237,246,255,0.55) 2px, transparent 2px, transparent calc(100% / 24)), linear-gradient(to right, rgba(20,184,166,0.15), rgba(59,130,246,0.15))"
+              }}
+            />
+          </div>
+
+          <div className="relative h-[6.5rem] rounded-lg border border-app-border bg-app-panel">
+            <div className="absolute inset-x-0 inset-y-3 grid grid-cols-96 overflow-hidden rounded-lg">
               {quarterHourMarks.map((slot) => {
                 const isHourMark = slot % 4 === 0;
-
                 return (
                   <div key={slot} className={isHourMark ? "border-l border-app-border/90" : "border-l border-app-border/35"} />
                 );
               })}
             </div>
 
-            <div className="absolute inset-x-0 top-8 h-24 px-3">
-              {segments.length === 0 ? (
-                <div className="flex h-full items-center justify-center rounded-md border border-dashed border-app-border bg-app-surface/60 text-sm text-app-muted">
-                  Empty timeline. Press a category below to create the first 1-hour block.
-                </div>
-              ) : (
-                <div className="relative h-full">
-                  {segments.map((segment) => {
+            <div className="absolute inset-x-0 inset-y-3 px-3">
+              <div
+                ref={trackRef}
+                className={`relative h-full ${draggingCategoryId ? "cursor-grabbing" : ""}`}
+                onPointerMove={handleTrackPointerMove}
+                onPointerUp={handleTrackPointerUp}
+                onPointerCancel={handleTrackPointerCancel}
+                onPointerLeave={() => {
+                  setDropPreviewSlot(null);
+                  setIsTrashHot(false);
+                }}
+              >
+                {showCurrentTimeMarker ? (
+                  <div
+                    className="pointer-events-none absolute inset-y-0 z-40"
+                    style={{ left: `${currentTimePercent}%`, transform: "translateX(-50%)" }}
+                  >
+                    <div aria-hidden="true" className="h-full w-[2px] bg-app-accent/55 shadow-[0_0_0_1px_rgba(255,255,255,0.28)]" />
+                    <div className="pointer-events-auto absolute -top-4 left-1/2 -translate-x-1/2">
+                      <Tooltip content={currentTimeLabel}>
+                        <button
+                          type="button"
+                          className="h-2.5 w-2.5 rounded-full border border-white/60 bg-app-accent/90 shadow-[0_0_0_2px_rgba(13,18,31,0.45)] outline-none transition-transform duration-150 hover:scale-110 focus-visible:scale-110 focus-visible:ring-2 focus-visible:ring-app-accent/60"
+                          aria-label={`Current time: ${currentTimeLabel}`}
+                        />
+                      </Tooltip>
+                    </div>
+                  </div>
+                ) : null}
+
+                {visibleSegments.length === 0 && dropPreviewSlot === null ? (
+                  <div className="flex h-full items-center justify-center rounded-md border border-dashed border-app-border bg-app-surface/60 text-sm text-app-muted">
+                    Empty timeline. Drag a category below to create the first block.
+                  </div>
+                ) : (
+                  <>
+                    {visibleSegments.map((segment) => {
                     const category = categoriesById.get(segment.categoryId);
                     const left = `${(segment.startSlot / TOTAL_DAY_SLOTS) * 100}%`;
                     const width = `${((segment.endSlot - segment.startSlot) / TOTAL_DAY_SLOTS) * 100}%`;
+                    const isActive = interaction?.segmentId === segment.id;
+                    const segmentLabel = category?.label ?? segment.categoryId;
+                    const segmentTimeRangeLabel = formatSlotRangeLabelMeridiem(segment.startSlot, segment.endSlot);
+                    const segmentDurationLabel = formatSlotDurationLabel(segment.startSlot, segment.endSlot);
 
                     return (
                       <div
                         key={segment.id}
-                        className="absolute inset-y-0 flex min-w-0 flex-col justify-between overflow-hidden rounded-md border border-black/20 px-3 py-2 text-white shadow-sm"
+                        className={`absolute inset-y-0 flex min-w-0 select-none flex-col justify-between overflow-visible rounded-md border border-black/20 text-white shadow-sm ${isActive ? "ring-2 ring-app-accent/60" : ""}`}
                         style={{
                           left,
                           width,
-                          backgroundColor: category?.color ?? "#475569"
+                          backgroundColor: category?.color ?? "#475569",
+                          zIndex: isActive ? 10 : 1
                         }}
                       >
-                        <span className="truncate text-sm font-semibold">{category?.label ?? segment.categoryId}</span>
-                        <span className="truncate text-xs text-white/85">
-                          {formatSlotRangeLabel(segment.startSlot, segment.endSlot)}
-                        </span>
+                        {/* Left resize handle */}
+                        <div
+                          className="absolute inset-y-0 left-0 z-10 w-3 cursor-ew-resize rounded-l-md hover:bg-black/20"
+                          onPointerDown={(event) => handleLeftHandlePointerDown(event, segment)}
+                        />
+
+                        {/* Block body (move handle) */}
+                        <Tooltip content={`${segmentLabel} • ${segmentTimeRangeLabel} • ${segmentDurationLabel}`} triggerClassName="absolute inset-y-0 left-3 right-3 block h-full w-full">
+                          <div
+                            className={`flex h-full w-full flex-col justify-start gap-0.5 overflow-hidden px-1 py-2 ${isActive && interaction?.mode === "move" ? "cursor-grabbing" : "cursor-grab"}`}
+                            onPointerDown={(event) => handleBodyPointerDown(event, segment)}
+                          >
+                            <span className="truncate text-sm font-semibold">{segmentLabel}</span>
+                            <span className="truncate text-xs text-white/85">{segmentTimeRangeLabel}</span>
+                            <span className="truncate text-[11px] text-white/70">{segmentDurationLabel}</span>
+                          </div>
+                        </Tooltip>
+
+                        {/* Right resize handle */}
+                        <div
+                          className="absolute inset-y-0 right-0 z-10 w-3 cursor-ew-resize rounded-r-md hover:bg-black/20"
+                          onPointerDown={(event) => handleRightHandlePointerDown(event, segment)}
+                        />
                       </div>
                     );
                   })}
-                </div>
-              )}
+
+                    {draggingCategoryId !== null && dropPreviewSlot !== null && (() => {
+                      const dropCategory = categoriesById.get(draggingCategoryId);
+                      const previewEnd = dropPreviewSlot + DEFAULT_SEGMENT_DURATION_SLOTS;
+                      return (
+                        <div
+                          className="pointer-events-none absolute inset-y-0 rounded-md border-2 border-white/60 opacity-70 shadow-md"
+                          style={{
+                            left: `${(dropPreviewSlot / TOTAL_DAY_SLOTS) * 100}%`,
+                            width: `${(DEFAULT_SEGMENT_DURATION_SLOTS / TOTAL_DAY_SLOTS) * 100}%`,
+                            backgroundColor: dropCategory?.color ?? "#475569",
+                            zIndex: 20
+                          }}
+                        >
+                          <div className="flex h-full flex-col justify-between overflow-hidden px-3 py-2 text-white">
+                            <span className="truncate text-sm font-semibold">{dropCategory?.label}</span>
+                            <span className="truncate text-xs text-white/85">
+                              {formatSlotRangeLabelMeridiem(dropPreviewSlot, previewEnd)}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {footer ? <div>{footer}</div> : null}
     </section>
   );
 }
