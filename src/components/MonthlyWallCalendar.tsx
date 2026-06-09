@@ -125,7 +125,7 @@ function MonthlyWallCalendar({
                     cell.isCurrentMonth
                       ? "bg-app-surface text-app-text"
                       : "cursor-default bg-app-panel/70 text-app-muted/45"
-                  } ${cell.isToday ? "ring-1 ring-inset ring-app-accent/60" : ""} ${
+                  } ${cell.isToday ? "ring-2 ring-inset ring-app-accent" : ""} ${
                     cell.isCurrentMonth && selectedDateKey === cell.isoDate ? "ring-2 ring-inset ring-app-accent" : ""
                   }`}
                 >

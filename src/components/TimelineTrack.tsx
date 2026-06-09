@@ -16,6 +16,7 @@ import Tooltip from "./Tooltip";
 
 type TimelineTrackProps = {
   title: string;
+  titleSuffix?: string;
   subtitle?: string;
   categories: PlannerCategory[];
   segments: PlannerSegment[];
@@ -107,6 +108,7 @@ function isPointerInElement(clientX: number, clientY: number, element: HTMLEleme
  */
 function TimelineTrack({
   title,
+  titleSuffix,
   subtitle,
   categories,
   segments,
@@ -293,7 +295,14 @@ function TimelineTrack({
     <section className="flex flex-col gap-4 rounded-lg border border-app-border bg-app-surface p-4">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold">{title}</h2>
+          <h2 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-lg font-semibold">
+            <span>{title}</span>
+            {titleSuffix ? (
+              <span className="rounded-full border border-app-accent/50 bg-app-accent/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.16em] text-app-accent">
+                {titleSuffix}
+              </span>
+            ) : null}
+          </h2>
           <p className="text-sm text-app-muted">{subtitle ?? "0-24 timeline at 15-minute resolution"}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -333,8 +342,8 @@ function TimelineTrack({
               <path d="M7.5 7l.7 11a2 2 0 0 0 2 1.9h3.6a2 2 0 0 0 2-1.9l.7-11" strokeLinecap="round" />
               <path d="M10 11v5M14 11v5" strokeLinecap="round" />
             </svg>
-            <span className="relative inline-block w-[8.75rem] text-left">
-              <span className={`transition-opacity ${isTrashHot ? "opacity-0" : "opacity-100"}`}>Drag here to delete</span>
+            <span className="relative inline-block w-[7.75rem] text-left">
+              <span className={`transition-opacity ${isTrashHot ? "opacity-0" : "opacity-100"}`}>Delete Block</span>
               <span className={`absolute inset-0 transition-opacity ${isTrashHot ? "opacity-100" : "opacity-0"}`}>Release to delete</span>
             </span>
           </div>
