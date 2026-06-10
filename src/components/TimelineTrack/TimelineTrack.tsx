@@ -39,6 +39,7 @@ type TimelineTrackProps = {
   onDropCategory: (categoryId: string, startSlot: number, endSlot: number) => void;
   onCopyTimeline: () => void;
   onPasteTimeline: () => void;
+  onClearTimeline: () => void;
   onDeleteSegment: (segmentId: string) => void;
   footer?: ReactNode;
   showCurrentTimeMarker?: boolean;
@@ -60,6 +61,7 @@ function TimelineTrack({
   onDropCategory,
   onCopyTimeline,
   onPasteTimeline,
+  onClearTimeline,
   onDeleteSegment,
   footer,
   showCurrentTimeMarker = false
@@ -255,6 +257,16 @@ function TimelineTrack({
             Paste
           </button>
 
+          <button
+            type="button"
+            className={getTimelineControlButtonClassName(segments.length > 0)}
+            onClick={onClearTimeline}
+            disabled={segments.length === 0}
+            aria-disabled={segments.length === 0}
+          >
+            Clear
+          </button>
+
           <div
             ref={trashRef}
             className={`pointer-events-none flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
@@ -400,6 +412,19 @@ function TimelineTrack({
                           className={`absolute inset-y-0 right-0 z-10 cursor-ew-resize rounded-r-md hover:bg-black/20 ${resizeHandleWidthClass}`}
                           onPointerDown={(event) => handleRightHandlePointerDown(event, segment)}
                         />
+
+                        {segment.categoryId === "eat" && (segment.assignedMealIds?.length ?? 0) > 0 ? (
+                          <span
+                            aria-hidden="true"
+                            className="pointer-events-none absolute right-1 top-1 z-20 flex h-4 w-4 items-center justify-center rounded-full bg-slate-950/70 text-emerald-300"
+                          >
+                            <svg viewBox="0 0 24 24" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" />
+                              <path d="M7 2v20" />
+                              <path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" />
+                            </svg>
+                          </span>
+                        ) : null}
                       </Tooltip>
                     );
                   })}

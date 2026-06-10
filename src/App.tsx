@@ -1,4 +1,5 @@
 import CategoryPalette from "./components/CategoryPalette/CategoryPalette";
+import ConfirmDialog from "./components/ConfirmDialog/ConfirmDialog";
 import MealAssignmentPanel from "./components/MealAssignmentPanel/MealAssignmentPanel";
 import MealCreator from "./components/MealCreator/MealCreator";
 import MealTimelineTrack from "./components/MealTimelineTrack/MealTimelineTrack";
@@ -29,6 +30,7 @@ import {
   getMealPlannerRelativeLabel
 } from "./lib/plannerViewHelpers";
 import { formatSlotRangeLabelMeridiem } from "./lib/timeline";
+import { useConfirmDialogStore } from "./store/confirmDialogStore";
 import { usePlannerStore } from "./store/plannerStore";
 import { useMealStore } from "./store/mealStore";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
@@ -65,6 +67,7 @@ function App() {
   const moveSegmentForDate = usePlannerStore((state) => state.moveSegmentForDate);
   const resizeSegmentForDate = usePlannerStore((state) => state.resizeSegmentForDate);
   const deleteSegmentForDate = usePlannerStore((state) => state.deleteSegmentForDate);
+  const clearSegmentsForDate = usePlannerStore((state) => state.clearSegmentsForDate);
   const setSegmentAssignedMealsForDate = usePlannerStore((state) => state.setSegmentAssignedMealsForDate);
   const pasteSegmentsForDate = usePlannerStore((state) => state.pasteSegmentsForDate);
   const meals = useMealStore((state) => state.meals);
@@ -73,6 +76,7 @@ function App() {
   const undoPlannerEdit = usePlannerStore((state) => state.undoPlannerEdit);
   const redoPlannerEdit = usePlannerStore((state) => state.redoPlannerEdit);
   const showToast = useToastStore((state) => state.showToast);
+  const requestConfirm = useConfirmDialogStore((state) => state.requestConfirm);
   const [activeTab, setActiveTab] = useState<AppTab>(() => {
     if (typeof window === "undefined") {
       return APP_TABS[0].id;
@@ -291,6 +295,26 @@ function App() {
   }
 
   /**
+   * Prompts for confirmation, then removes all blocks from a date's timeline.
+   */
+  function handleClearTimeline(dateKey: PlannerDateKey, dateLabel: string): void {
+    requestConfirm({
+      title: "Clear timeline?",
+      message: `This will remove all blocks from ${dateLabel}. You can undo this afterwards.`,
+      confirmLabel: "Clear",
+      tone: "danger",
+      onConfirm: () => {
+        clearSegmentsForDate(dateKey);
+        showToast({
+          title: "Timeline cleared",
+          message: `Removed all blocks from ${dateLabel}.`,
+          level: "info"
+        });
+      }
+    });
+  }
+
+  /**
    * Switches the active tab, closing the meal assignment dock if it is open.
    */
   function handleSelectTab(tab: AppTab): void {
@@ -356,6 +380,7 @@ function App() {
   return (
     <>
       <ToastViewport />
+      <ConfirmDialog />
       <main
         className={`min-h-screen bg-app-bg px-4 py-5 text-app-text lg:px-6 lg:py-6 ${selectedDateKey || selectedEatSegment ? "pb-[37rem] lg:pb-[39rem]" : "pb-32 lg:pb-36"} ${draggingCategoryId ? "cursor-grabbing" : ""}`}
         onPointerUp={isDayPlannerTab ? () => setDraggingCategoryId(null) : undefined}
@@ -438,6 +463,7 @@ function App() {
                     draggingCategoryId={draggingCategoryId}
                     onCopyTimeline={() => handleCopyTimeline(dateKey)}
                     onPasteTimeline={() => handlePasteTimeline(dateKey)}
+                    onClearTimeline={() => handleClearTimeline(dateKey, formatCalendarDateLabel(dateKey))}
                     onDropCategory={(categoryId, startSlot, endSlot) =>
                       handleDropCategory(dateKey, categoryId, startSlot, endSlot)
                     }
@@ -526,6 +552,7 @@ function App() {
                     draggingCategoryId={draggingCategoryId}
                     onCopyTimeline={() => handleCopyTimeline(selectedDateKey)}
                     onPasteTimeline={() => handlePasteTimeline(selectedDateKey)}
+                    onClearTimeline={() => handleClearTimeline(selectedDateKey, selectedDateTitle)}
                     onDropCategory={(categoryId, startSlot, endSlot) =>
                       handleDropCategory(selectedDateKey, categoryId, startSlot, endSlot)
                     }

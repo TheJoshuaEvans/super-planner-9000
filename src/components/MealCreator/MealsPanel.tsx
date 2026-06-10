@@ -58,6 +58,11 @@ function MealsPanel() {
     [meals]
   );
 
+  const sortedComponents = useMemo(
+    () => [...components].sort((a, b) => a.name.localeCompare(b.name)),
+    [components]
+  );
+
   const componentsById = useMemo(
     () => new Map(components.map((c) => [c.id, c])),
     [components]
@@ -217,7 +222,7 @@ function MealsPanel() {
                       className="min-w-0 flex-1 rounded-md border border-app-border bg-app-bg px-2 py-2 text-sm text-app-text focus:border-app-accent/60 focus:outline-none focus:ring-2 focus:ring-app-accent/20"
                     >
                       <option value="">Select component…</option>
-                      {components.map((c) => (
+                      {sortedComponents.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.name}
                         </option>

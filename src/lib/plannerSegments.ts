@@ -108,19 +108,26 @@ export function applySegmentOverwrite(
 
 /**
  * Creates a new planner segment for the provided category and slot range.
+ * Preserves assigned meal ids when provided, e.g. when pasting a copied segment.
  */
-export function createSegment(categoryId: string, startSlot: number, endSlot: number): PlannerSegment {
+export function createSegment(
+  categoryId: string,
+  startSlot: number,
+  endSlot: number,
+  assignedMealIds?: string[]
+): PlannerSegment {
   return {
     id: createSegmentId(),
     categoryId,
     startSlot,
-    endSlot
+    endSlot,
+    ...(assignedMealIds && assignedMealIds.length > 0 ? { assignedMealIds: [...assignedMealIds] } : {})
   };
 }
 
 /**
  * Merges copied segments into an existing timeline using overwrite semantics.
- * Incoming segments are normalized and recreated with fresh ids.
+ * Incoming segments are normalized and recreated with fresh ids, preserving any assigned meals.
  */
 export function pasteSegmentsWithOverwrite(
   existingSegments: PlannerSegment[],
@@ -130,14 +137,18 @@ export function pasteSegmentsWithOverwrite(
     .map((segment) => ({
       categoryId: segment.categoryId,
       startSlot: clampSlot(segment.startSlot),
-      endSlot: clampSlot(segment.endSlot)
+      endSlot: clampSlot(segment.endSlot),
+      assignedMealIds: segment.assignedMealIds
     }))
     .filter((segment) => segment.endSlot > segment.startSlot)
     .sort((left, right) => left.startSlot - right.startSlot);
 
   return normalizedCopied.reduce(
     (segments, segment) =>
-      applySegmentOverwrite(segments, createSegment(segment.categoryId, segment.startSlot, segment.endSlot)),
+      applySegmentOverwrite(
+        segments,
+        createSegment(segment.categoryId, segment.startSlot, segment.endSlot, segment.assignedMealIds)
+      ),
     existingSegments
   );
 }

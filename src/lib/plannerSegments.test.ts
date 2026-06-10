@@ -16,6 +16,13 @@ describe("plannerSegments", () => {
     expect(segment.startSlot).toBe(4);
     expect(segment.endSlot).toBe(8);
     expect(segment.id.startsWith("segment-")).toBe(true);
+    expect(segment.assignedMealIds).toBeUndefined();
+  });
+
+  it("creates a segment with assigned meal ids when provided", () => {
+    const segment = createSegment("eat", 4, 8, ["meal-1", "meal-2"]);
+
+    expect(segment.assignedMealIds).toEqual(["meal-1", "meal-2"]);
   });
 
   it("inserts non-overlapping segment and sorts by start slot", () => {
@@ -143,6 +150,27 @@ describe("plannerSegments", () => {
     expect(updated).toHaveLength(1);
     expect(updated[0].id).not.toBe("copy-1");
     expect(updated[0].id.startsWith("segment-")).toBe(true);
+  });
+
+  it("preserves assigned meal ids when pasting an Eat segment", () => {
+    const copied = [
+      { id: "copy-1", categoryId: "eat", startSlot: 4, endSlot: 8, assignedMealIds: ["meal-1", "meal-2"] }
+    ];
+
+    const updated = pasteSegmentsWithOverwrite([], copied);
+
+    expect(updated).toHaveLength(1);
+    expect(updated[0]).toMatchObject({ categoryId: "eat", assignedMealIds: ["meal-1", "meal-2"] });
+  });
+
+  it("does not add an assignedMealIds field when pasting a segment without one", () => {
+    const copied = [
+      { id: "copy-1", categoryId: "work", startSlot: 4, endSlot: 8 }
+    ];
+
+    const updated = pasteSegmentsWithOverwrite([], copied);
+
+    expect(updated[0].assignedMealIds).toBeUndefined();
   });
 
   it("classifies an empty timeline as empty", () => {
