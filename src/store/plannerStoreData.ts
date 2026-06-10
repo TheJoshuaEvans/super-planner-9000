@@ -17,10 +17,31 @@ export function clonePersistedData(data: PlannerPersistedData): PlannerPersisted
     segmentsByDate: Object.fromEntries(
       Object.entries(data.segmentsByDate).map(([dateKey, segments]) => [
         dateKey,
-        segments.map((segment) => ({ ...segment }))
+        segments.map((segment) => ({
+          ...segment,
+          ...(segment.assignedMealIds ? { assignedMealIds: [...segment.assignedMealIds] } : {})
+        }))
       ])
     )
   };
+}
+
+/**
+ * Returns true when two optional meal id lists contain the same ids in the same order.
+ *
+ * @param left - First meal id list, if any.
+ * @param right - Second meal id list, if any.
+ * @returns Whether the lists are equivalent (treating missing and empty lists as equal).
+ */
+function areAssignedMealIdsEqual(left: string[] | undefined, right: string[] | undefined): boolean {
+  const leftIds = left ?? [];
+  const rightIds = right ?? [];
+
+  if (leftIds.length !== rightIds.length) {
+    return false;
+  }
+
+  return leftIds.every((id, index) => id === rightIds[index]);
 }
 
 /**
@@ -89,7 +110,8 @@ export function arePersistedDataEqual(left: PlannerPersistedData, right: Planner
         leftSegment.id !== rightSegment.id ||
         leftSegment.categoryId !== rightSegment.categoryId ||
         leftSegment.startSlot !== rightSegment.startSlot ||
-        leftSegment.endSlot !== rightSegment.endSlot
+        leftSegment.endSlot !== rightSegment.endSlot ||
+        !areAssignedMealIdsEqual(leftSegment.assignedMealIds, rightSegment.assignedMealIds)
       ) {
         return false;
       }

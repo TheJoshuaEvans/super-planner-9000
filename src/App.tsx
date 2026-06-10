@@ -1,4 +1,5 @@
 import CategoryPalette from "./components/CategoryPalette/CategoryPalette";
+import MealAssignmentPanel from "./components/MealAssignmentPanel/MealAssignmentPanel";
 import MealCreator from "./components/MealCreator/MealCreator";
 import MealTimelineTrack from "./components/MealTimelineTrack/MealTimelineTrack";
 import MonthlyWallCalendar from "./components/MonthlyWallCalendar/MonthlyWallCalendar";
@@ -15,6 +16,7 @@ import {
 } from "./lib/appTabs";
 import type { AppTab } from "./lib/appTabs";
 import { formatCalendarDateLabel, getRelativeCalendarDateKey } from "./lib/calendar";
+import { toggleMealSelection } from "./lib/mealAssignment";
 import {
   buildPlannerExportFilename,
   parsePlannerDataImport,
@@ -32,6 +34,12 @@ import { useMealStore } from "./store/mealStore";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useToastStore } from "./store/toastStore";
 import type { PlannerDateKey, PlannerSegment } from "./store/plannerStore";
+
+/** Identifies the "Eat" segment currently selected for meal assignment. */
+type SelectedEatSegment = {
+  dateKey: PlannerDateKey;
+  segmentId: string;
+};
 
 const PORTRAIT_WARNING_SESSION_KEY = "sp9000-portrait-warning-dismissed";
 
@@ -57,7 +65,9 @@ function App() {
   const moveSegmentForDate = usePlannerStore((state) => state.moveSegmentForDate);
   const resizeSegmentForDate = usePlannerStore((state) => state.resizeSegmentForDate);
   const deleteSegmentForDate = usePlannerStore((state) => state.deleteSegmentForDate);
+  const setSegmentAssignedMealsForDate = usePlannerStore((state) => state.setSegmentAssignedMealsForDate);
   const pasteSegmentsForDate = usePlannerStore((state) => state.pasteSegmentsForDate);
+  const meals = useMealStore((state) => state.meals);
   const canUndoPlannerEdit = usePlannerStore((state) => state.canUndo);
   const canRedoPlannerEdit = usePlannerStore((state) => state.canRedo);
   const undoPlannerEdit = usePlannerStore((state) => state.undoPlannerEdit);
@@ -79,6 +89,8 @@ function App() {
   const [copiedTimelineSegments, setCopiedTimelineSegments] = useState<PlannerSegment[] | null>(null);
   const [copiedTimelineSourceDateKey, setCopiedTimelineSourceDateKey] = useState<PlannerDateKey | null>(null);
   const [selectedDateKey, setSelectedDateKey] = useState<PlannerDateKey | null>(null);
+  const [selectedEatSegment, setSelectedEatSegment] = useState<SelectedEatSegment | null>(null);
+  const [pendingMealIds, setPendingMealIds] = useState<string[]>([]);
   const [isPortraitWarningDismissed, setIsPortraitWarningDismissed] = useState<boolean>(() => {
     if (typeof window === "undefined") {
       return false;
@@ -92,6 +104,13 @@ function App() {
   const selectedDateTitle = selectedDateKey ? formatCalendarDateLabel(selectedDateKey) : "";
   const activeTabDefinition = getAppTabDefinition(activeTab);
   const isDayPlannerTab = activeTabDefinition.contentKind === "day-planner";
+  const isMealPlannerTab = activeTabDefinition.contentKind === "meal-planner";
+  const selectedEatSegmentData = selectedEatSegment
+    ? (segmentsByDate[selectedEatSegment.dateKey] ?? []).find((segment) => segment.id === selectedEatSegment.segmentId)
+    : undefined;
+  const selectedEatSegmentLabel = selectedEatSegment && selectedEatSegmentData
+    ? `${formatCalendarDateLabel(selectedEatSegment.dateKey)} • ${formatSlotRangeLabelMeridiem(selectedEatSegmentData.startSlot, selectedEatSegmentData.endSlot)}`
+    : "";
 
   useEffect(() => {
     window.localStorage.setItem(ACTIVE_TAB_LOCAL_STORAGE_KEY, activeTab);
@@ -170,6 +189,8 @@ function App() {
       setCopiedTimelineSegments(null);
       setCopiedTimelineSourceDateKey(null);
       setDraggingCategoryId(null);
+      setSelectedEatSegment(null);
+      setPendingMealIds([]);
       showToast({
         title: "Planner imported",
         message: "The current planner state was replaced with the imported file.",
@@ -270,6 +291,15 @@ function App() {
   }
 
   /**
+   * Switches the active tab, closing the meal assignment dock if it is open.
+   */
+  function handleSelectTab(tab: AppTab): void {
+    setActiveTab(tab);
+    setSelectedEatSegment(null);
+    setPendingMealIds([]);
+  }
+
+  /**
    * Hides the portrait warning overlay for the duration of the current browser session.
    */
   function handleDismissPortraitWarning(): void {
@@ -277,17 +307,57 @@ function App() {
     window.sessionStorage.setItem(PORTRAIT_WARNING_SESSION_KEY, "true");
   }
 
+  /**
+   * Opens the meal assignment dock for the clicked Eat segment, seeded with its current assignments.
+   */
   function handleMealEatSegmentClick(dateKey: PlannerDateKey, segment: PlannerSegment): void {
-    window.alert(
-      `debug: Eat section clicked for ${formatCalendarDateLabel(dateKey)} at ${formatSlotRangeLabelMeridiem(segment.startSlot, segment.endSlot)}`
-    );
+    setSelectedEatSegment({ dateKey, segmentId: segment.id });
+    setPendingMealIds(segment.assignedMealIds ?? []);
+  }
+
+  /**
+   * Toggles a meal in or out of the pending assignment selection.
+   */
+  function handleToggleAssignedMeal(mealId: string): void {
+    setPendingMealIds((current) => toggleMealSelection(current, mealId));
+  }
+
+  /**
+   * Closes the meal assignment dock without saving changes.
+   */
+  function handleCloseMealAssignment(): void {
+    setSelectedEatSegment(null);
+    setPendingMealIds([]);
+  }
+
+  /**
+   * Saves the pending meal selection to the selected Eat segment and closes the dock.
+   */
+  function handleSubmitMealAssignment(): void {
+    if (!selectedEatSegment) {
+      return;
+    }
+
+    setSegmentAssignedMealsForDate(selectedEatSegment.dateKey, selectedEatSegment.segmentId, pendingMealIds);
+
+    showToast({
+      title: "Meals assigned",
+      message:
+        pendingMealIds.length > 0
+          ? `Assigned ${pendingMealIds.length} meal${pendingMealIds.length === 1 ? "" : "s"} to the selected Eat block.`
+          : "Cleared meal assignments for the selected Eat block.",
+      level: "success"
+    });
+
+    setSelectedEatSegment(null);
+    setPendingMealIds([]);
   }
 
   return (
     <>
       <ToastViewport />
       <main
-        className={`min-h-screen bg-app-bg px-4 py-5 text-app-text lg:px-6 lg:py-6 ${selectedDateKey ? "pb-[37rem] lg:pb-[39rem]" : "pb-32 lg:pb-36"} ${draggingCategoryId ? "cursor-grabbing" : ""}`}
+        className={`min-h-screen bg-app-bg px-4 py-5 text-app-text lg:px-6 lg:py-6 ${selectedDateKey || selectedEatSegment ? "pb-[37rem] lg:pb-[39rem]" : "pb-32 lg:pb-36"} ${draggingCategoryId ? "cursor-grabbing" : ""}`}
         onPointerUp={isDayPlannerTab ? () => setDraggingCategoryId(null) : undefined}
       >
         <section className="mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-[96rem] flex-col gap-5 rounded-lg bg-app-panel p-5 shadow-card lg:min-h-[calc(100vh-3rem)] lg:p-6">
@@ -309,7 +379,7 @@ function App() {
                     <button
                       key={tab.id}
                       type="button"
-                      onClick={() => setActiveTab(tab.id)}
+                      onClick={() => handleSelectTab(tab.id)}
                       className={`rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
                         isActive ? "bg-app-accent text-white shadow-sm" : "text-app-muted hover:text-app-text"
                       }`}
@@ -397,6 +467,7 @@ function App() {
                   subtitle={formatDashboardDateSubtitle(dateKey)}
                   categories={categories}
                   segments={segmentsByDate[dateKey] ?? []}
+                  meals={meals}
                   showCurrentTimeMarker={dayOffset === 0}
                   onEatSegmentClick={(segment) => handleMealEatSegmentClick(dateKey, segment)}
                 />
@@ -467,6 +538,21 @@ function App() {
                 categories={categories}
                 draggingCategoryId={draggingCategoryId}
                 onCategoryDragStart={setDraggingCategoryId}
+              />
+            </div>
+          </section>
+        ) : null}
+
+        {isMealPlannerTab && selectedEatSegment ? (
+          <section className="fixed inset-x-0 bottom-0 z-50 px-4 pb-4 lg:px-6 lg:pb-5">
+            <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-4 rounded-lg border border-app-border bg-app-surface/95 p-4 shadow-card backdrop-blur">
+              <MealAssignmentPanel
+                contextLabel={selectedEatSegmentLabel}
+                meals={meals}
+                selectedMealIds={pendingMealIds}
+                onToggleMeal={handleToggleAssignedMeal}
+                onSubmit={handleSubmitMealAssignment}
+                onClose={handleCloseMealAssignment}
               />
             </div>
           </section>

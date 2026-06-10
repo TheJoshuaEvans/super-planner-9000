@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { getMealDaySortKey, resolveAssignedMeals } from "../../lib/mealAssignment";
 import {
   formatClockTimeLabel,
   formatHourLabel,
@@ -10,6 +11,7 @@ import {
 } from "../../lib/timeline";
 import { resolveCurrentTimePercent } from "../../lib/timelineNow";
 import { useTimelineMarkerClock } from "../../hooks/useTimelineMarkerClock";
+import type { Meal } from "../../store/mealStore";
 import type { PlannerCategory, PlannerSegment } from "../../store/plannerStore";
 import Tooltip from "../Tooltip/Tooltip";
 
@@ -19,6 +21,7 @@ type MealTimelineTrackProps = {
   subtitle?: string;
   categories: PlannerCategory[];
   segments: PlannerSegment[];
+  meals: Meal[];
   showCurrentTimeMarker?: boolean;
   onEatSegmentClick?: (segment: PlannerSegment) => void;
 };
@@ -32,6 +35,7 @@ function MealTimelineTrack({
   subtitle,
   categories,
   segments,
+  meals,
   showCurrentTimeMarker = false,
   onEatSegmentClick
 }: MealTimelineTrackProps) {
@@ -50,12 +54,36 @@ function MealTimelineTrack({
     [currentTime]
   );
 
+  const eatSegmentsWithMeals = useMemo(
+    () =>
+      segments
+        .filter((segment) => segment.categoryId === "eat")
+        .map((segment) => ({ segment, assignedMeals: resolveAssignedMeals(meals, segment.assignedMealIds) }))
+        .filter((entry) => entry.assignedMeals.length > 0)
+        .sort((a, b) => getMealDaySortKey(a.segment.startSlot) - getMealDaySortKey(b.segment.startSlot)),
+    [segments, meals]
+  );
+
+  const hasUnassignedEatSegment = useMemo(
+    () =>
+      segments.some(
+        (segment) => segment.categoryId === "eat" && resolveAssignedMeals(meals, segment.assignedMealIds).length === 0
+      ),
+    [segments, meals]
+  );
+
   return (
     <section className="flex flex-col gap-4 rounded-lg border border-app-border bg-app-surface p-4">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-lg font-semibold">
-            <span className="rounded-full border border-app-accent/50 bg-app-accent/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.16em] text-app-accent">
+            <span
+              className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.16em] ${
+                hasUnassignedEatSegment
+                  ? "border-amber-300/50 bg-amber-300/15 text-amber-200"
+                  : "border-app-accent/50 bg-app-accent/15 text-app-accent"
+              }`}
+            >
               {weekdayLabel}
             </span>
             {relativeLabel ? (
@@ -143,11 +171,19 @@ function MealTimelineTrack({
                   const segmentLabel = category?.label ?? segment.categoryId;
                   const segmentTimeRangeLabel = formatSlotRangeLabelMeridiem(segment.startSlot, segment.endSlot);
                   const segmentDurationLabel = formatSlotDurationLabel(segment.startSlot, segment.endSlot);
+                  const assignedMeals = isEatSegment ? resolveAssignedMeals(meals, segment.assignedMealIds) : [];
+                  const hasAssignedMeals = assignedMeals.length > 0;
+                  const tooltipContent =
+                    assignedMeals.length > 0
+                      ? `${segmentLabel} • ${segmentTimeRangeLabel} • ${segmentDurationLabel} • Meals: ${assignedMeals
+                          .map((meal) => meal.name)
+                          .join(", ")}`
+                      : `${segmentLabel} • ${segmentTimeRangeLabel} • ${segmentDurationLabel}`;
 
                   return (
                     <Tooltip
                       key={segment.id}
-                      content={`${segmentLabel} • ${segmentTimeRangeLabel} • ${segmentDurationLabel}`}
+                      content={tooltipContent}
                       triggerClassName="!absolute inset-y-0 flex min-w-0 overflow-visible rounded-md"
                       triggerStyle={{
                         left,
@@ -162,13 +198,23 @@ function MealTimelineTrack({
                             onEatSegmentClick?.(segment);
                           }
                         }}
-                        className={`flex h-full w-full flex-col justify-start gap-0.5 overflow-hidden rounded-md border px-3 py-2 text-left shadow-sm transition ${
+                        className={`relative flex h-full w-full flex-col justify-start gap-0.5 overflow-hidden rounded-md border px-3 py-2 text-left shadow-sm transition ${
                           isEatSegment
-                            ? "border-amber-200/90 bg-amber-300 text-slate-950 hover:bg-amber-200"
+                            ? hasAssignedMeals
+                              ? "border-emerald-200/90 bg-emerald-300 text-slate-950 hover:bg-emerald-200"
+                              : "border-amber-200/90 bg-amber-300 text-slate-950 hover:bg-amber-200"
                             : "cursor-default border-black/25 bg-slate-900/80 text-white/60"
                         }`}
                         disabled={!isEatSegment}
                       >
+                        {hasAssignedMeals ? (
+                          <span
+                            aria-hidden="true"
+                            className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-slate-950/80 px-1 text-[10px] font-bold leading-none text-emerald-200"
+                          >
+                            {assignedMeals.length}
+                          </span>
+                        ) : null}
                         <span className="truncate text-sm font-semibold">{segmentLabel}</span>
                         <span className={`truncate text-xs ${isEatSegment ? "text-slate-900/80" : "text-white/50"}`}>
                           {segmentTimeRangeLabel}
@@ -185,6 +231,34 @@ function MealTimelineTrack({
           </div>
         </div>
       </div>
+
+      {eatSegmentsWithMeals.length > 0 ? (
+        <div className="space-y-2 border-t border-app-border pt-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-app-muted">Assigned Meals</p>
+          <ul className="space-y-2">
+            {eatSegmentsWithMeals.map(({ segment, assignedMeals }) => (
+              <li
+                key={segment.id}
+                className="flex flex-wrap items-center gap-2 rounded-md border border-app-border bg-app-panel/60 px-3 py-2"
+              >
+                <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-app-muted">
+                  {formatSlotRangeLabelMeridiem(segment.startSlot, segment.endSlot)}
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {assignedMeals.map((meal) => (
+                    <span
+                      key={meal.id}
+                      className="rounded-full border border-emerald-300/40 bg-emerald-300/15 px-2 py-0.5 text-xs font-medium text-emerald-200"
+                    >
+                      {meal.name}
+                    </span>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -17,6 +17,8 @@ export type PlannerSegment = {
   categoryId: string;
   startSlot: number;
   endSlot: number;
+  /** Ids of meals assigned to this segment (used for "Eat" category segments). */
+  assignedMealIds?: string[];
 };
 
 /** Calendar identity string in YYYY-MM-DD format. */
@@ -74,6 +76,11 @@ export type PlannerStore = PlannerState & {
    * Deletes a segment from the selected date timeline.
    */
   deleteSegmentForDate: (dateKey: PlannerDateKey, segmentId: string) => void;
+
+  /**
+   * Sets the list of meal ids assigned to a segment on the given date.
+   */
+  setSegmentAssignedMealsForDate: (dateKey: PlannerDateKey, segmentId: string, mealIds: string[]) => void;
 
   /**
    * Pastes copied segments into the selected date using overwrite merge rules.

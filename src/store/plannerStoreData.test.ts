@@ -53,6 +53,39 @@ describe("plannerStoreData", () => {
     expect(arePersistedDataEqual(left, right)).toBe(false);
   });
 
+  it("treats missing and empty assignedMealIds as equal but differing assignments as unequal", () => {
+    const left = buildPersistedData();
+    const right = buildPersistedData();
+
+    right.segmentsByDate["2026-06-09"][0] = {
+      ...right.segmentsByDate["2026-06-09"][0],
+      assignedMealIds: []
+    };
+
+    expect(arePersistedDataEqual(left, right)).toBe(true);
+
+    right.segmentsByDate["2026-06-09"][0] = {
+      ...right.segmentsByDate["2026-06-09"][0],
+      assignedMealIds: ["meal-1"]
+    };
+
+    expect(arePersistedDataEqual(left, right)).toBe(false);
+  });
+
+  it("deep clones assignedMealIds arrays independently", () => {
+    const original = buildPersistedData();
+    original.segmentsByDate["2026-06-09"][0] = {
+      ...original.segmentsByDate["2026-06-09"][0],
+      assignedMealIds: ["meal-1"]
+    };
+
+    const cloned = clonePersistedData(original);
+    cloned.segmentsByDate["2026-06-09"][0].assignedMealIds?.push("meal-2");
+
+    expect(original.segmentsByDate["2026-06-09"][0].assignedMealIds).toEqual(["meal-1"]);
+    expect(cloned.segmentsByDate["2026-06-09"][0].assignedMealIds).toEqual(["meal-1", "meal-2"]);
+  });
+
   it("returns date segments or an empty list", () => {
     const state = {
       ...buildPersistedData(),

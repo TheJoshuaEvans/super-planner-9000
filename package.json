@@ -18,7 +18,8 @@
     "pm2:stop": "pm2 stop super-planner-9000",
     "pm2:delete": "pm2 delete super-planner-9000",
     "pm2:logs": "pm2 logs super-planner-9000",
-    "pm2:status": "pm2 status"
+    "pm2:status": "pm2 status",
+    "pm2": "pm2"
   },
   "author": "Joshua Evans <thejoshuaevans@gmail.com>",
   "license": "MIT",

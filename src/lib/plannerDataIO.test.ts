@@ -170,4 +170,67 @@ describe("plannerDataIO", () => {
 
     expect(result).toEqual({ ok: false, error: "Import file is not valid JSON." });
   });
+
+  it("round-trips assigned meal ids on eat segments", () => {
+    const plannerDataWithMeals = {
+      categories: samplePlannerData.categories,
+      segmentsByDate: {
+        "2026-06-09": [
+          { id: "segment-eat", categoryId: "eat", startSlot: 32, endSlot: 36, assignedMealIds: ["meal-1"] }
+        ]
+      }
+    };
+
+    const envelope = createPlannerDataExportEnvelope(
+      plannerDataWithMeals,
+      sampleMealData,
+      new Date("2026-06-09T12:34:56.000Z")
+    );
+
+    expect(envelope.data.segmentsByDate["2026-06-09"][0]).toMatchObject({
+      assignedMealIds: ["meal-1"]
+    });
+
+    const result = parsePlannerDataImport(JSON.stringify(envelope));
+
+    expect(result).toEqual({ ok: true, data: envelope.data, meals: sampleMealData });
+  });
+
+  it("omits empty assignedMealIds from normalized export", () => {
+    const plannerDataWithEmptyAssignment = {
+      categories: samplePlannerData.categories,
+      segmentsByDate: {
+        "2026-06-09": [
+          { id: "segment-eat", categoryId: "eat", startSlot: 32, endSlot: 36, assignedMealIds: [] }
+        ]
+      }
+    };
+
+    const envelope = createPlannerDataExportEnvelope(
+      plannerDataWithEmptyAssignment,
+      sampleMealData,
+      new Date("2026-06-09T12:34:56.000Z")
+    );
+
+    expect(envelope.data.segmentsByDate["2026-06-09"][0]).not.toHaveProperty("assignedMealIds");
+  });
+
+  it("rejects segments with non-string assignedMealIds entries", () => {
+    const result = parsePlannerDataImport(
+      JSON.stringify({
+        app: PLANNER_DATA_EXPORT_APP,
+        version: PLANNER_DATA_EXPORT_VERSION,
+        exportedAt: "2026-06-09T12:34:56.000Z",
+        data: {
+          categories: [],
+          segmentsByDate: {
+            "2026-06-09": [{ id: "segment-1", categoryId: "eat", startSlot: 0, endSlot: 4, assignedMealIds: [42] }]
+          }
+        },
+        meals: { components: [], meals: [] }
+      })
+    );
+
+    expect(result).toEqual({ ok: false, error: "Import file does not contain valid planner data." });
+  });
 });

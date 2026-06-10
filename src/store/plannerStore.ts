@@ -98,6 +98,15 @@ export const usePlannerStore = create<PlannerStore>()(
             [dateKey]: segmentsForDate(state, dateKey).filter((segment) => segment.id !== segmentId)
           })
         ),
+      setSegmentAssignedMealsForDate: (dateKey, segmentId, mealIds) =>
+        set((state) =>
+          applyTimelineEdit(state, {
+            ...state.segmentsByDate,
+            [dateKey]: segmentsForDate(state, dateKey).map((segment) =>
+              segment.id === segmentId ? { ...segment, assignedMealIds: [...mealIds] } : segment
+            )
+          })
+        ),
       pasteSegmentsForDate: (dateKey, copiedSegments) =>
         set((state) =>
           applyTimelineEdit(state, {

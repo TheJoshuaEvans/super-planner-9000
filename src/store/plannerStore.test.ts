@@ -125,6 +125,23 @@ describe("plannerStore", () => {
     expect(resized[0]).toMatchObject({ id: "a", startSlot: 4, endSlot: 16 });
   });
 
+  it("sets and clears assigned meal ids for a segment", () => {
+    const store = usePlannerStore.getState();
+    store.setSegmentsForDate(DATE_A, [
+      { id: "a", categoryId: "eat", startSlot: 4, endSlot: 8 }
+    ]);
+
+    store.setSegmentAssignedMealsForDate(DATE_A, "a", ["meal-1", "meal-2"]);
+
+    let segments = usePlannerStore.getState().segmentsByDate[DATE_A] ?? [];
+    expect(segments[0]).toMatchObject({ id: "a", assignedMealIds: ["meal-1", "meal-2"] });
+
+    store.setSegmentAssignedMealsForDate(DATE_A, "a", []);
+
+    segments = usePlannerStore.getState().segmentsByDate[DATE_A] ?? [];
+    expect(segments[0]).toMatchObject({ id: "a", assignedMealIds: [] });
+  });
+
   it("deletes a segment from the selected day only", () => {
     const store = usePlannerStore.getState();
     store.setSegmentsForDate(DATE_A, [
