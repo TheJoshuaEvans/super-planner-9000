@@ -88,13 +88,13 @@ export function formatPasteTargetLabel(dateKeys: PlannerDateKey[]): string {
 }
 
 /**
- * Returns the relative human-readable label for a meal planner week row at the given day offset.
+ * Returns the relative human-readable label for a current-week row at the given day offset.
  * Only the first three rows receive a label; offsets 3 and above return undefined.
  *
  * @param dayOffset - Zero-based offset from today (0 = today, 1 = tomorrow, ...).
  * @returns "Today", "Tomorrow", "Day after Tomorrow", or undefined.
  */
-export function getMealPlannerRelativeLabel(dayOffset: number): string | undefined {
+export function getRelativeWeekDayLabel(dayOffset: number): string | undefined {
   if (dayOffset === 0) return "Today";
   if (dayOffset === 1) return "Tomorrow";
   if (dayOffset === 2) return "Day after Tomorrow";

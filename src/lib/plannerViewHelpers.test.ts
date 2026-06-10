@@ -4,7 +4,7 @@ import {
   formatDashboardWeekdayLabel,
   formatDateKeyList,
   formatPasteTargetLabel,
-  getMealPlannerRelativeLabel
+  getRelativeWeekDayLabel
 } from "./plannerViewHelpers";
 
 describe("formatDashboardDateSubtitle", () => {
@@ -74,22 +74,22 @@ describe("formatPasteTargetLabel", () => {
   });
 });
 
-describe("getMealPlannerRelativeLabel", () => {
+describe("getRelativeWeekDayLabel", () => {
   it("returns 'Today' for offset 0", () => {
-    expect(getMealPlannerRelativeLabel(0)).toBe("Today");
+    expect(getRelativeWeekDayLabel(0)).toBe("Today");
   });
 
   it("returns 'Tomorrow' for offset 1", () => {
-    expect(getMealPlannerRelativeLabel(1)).toBe("Tomorrow");
+    expect(getRelativeWeekDayLabel(1)).toBe("Tomorrow");
   });
 
   it("returns 'Day after Tomorrow' for offset 2", () => {
-    expect(getMealPlannerRelativeLabel(2)).toBe("Day after Tomorrow");
+    expect(getRelativeWeekDayLabel(2)).toBe("Day after Tomorrow");
   });
 
   it("returns undefined for offsets 3 and above", () => {
-    expect(getMealPlannerRelativeLabel(3)).toBeUndefined();
-    expect(getMealPlannerRelativeLabel(6)).toBeUndefined();
-    expect(getMealPlannerRelativeLabel(100)).toBeUndefined();
+    expect(getRelativeWeekDayLabel(3)).toBeUndefined();
+    expect(getRelativeWeekDayLabel(6)).toBeUndefined();
+    expect(getRelativeWeekDayLabel(100)).toBeUndefined();
   });
 });

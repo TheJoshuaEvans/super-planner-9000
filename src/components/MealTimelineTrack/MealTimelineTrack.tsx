@@ -1,23 +1,22 @@
 import { useMemo } from "react";
-import { getMealDaySortKey, resolveAssignedMeals } from "../../lib/mealAssignment";
+import { resolveAssignedMeals } from "../../lib/mealAssignment";
 import {
   formatClockTimeLabel,
-  formatHourLabel,
   formatSlotDurationLabel,
   formatSlotRangeLabelMeridiem,
-  hourMarks,
-  quarterHourMarks,
   TOTAL_DAY_SLOTS
 } from "../../lib/timeline";
 import { resolveCurrentTimePercent } from "../../lib/timelineNow";
 import { useTimelineMarkerClock } from "../../hooks/useTimelineMarkerClock";
 import type { Meal } from "../../store/mealStore";
 import type { PlannerCategory, PlannerSegment } from "../../store/plannerStore";
+import TimelineHourRuler from "../shared/TimelineHourRuler";
+import TimelineQuarterHourGrid from "../shared/TimelineQuarterHourGrid";
 import Tooltip from "../Tooltip/Tooltip";
 
 type MealTimelineTrackProps = {
-  weekdayLabel: string;
-  relativeLabel?: string;
+  title: string;
+  titleSuffix?: string;
   subtitle?: string;
   categories: PlannerCategory[];
   segments: PlannerSegment[];
@@ -30,8 +29,8 @@ type MealTimelineTrackProps = {
  * Read-only meal-focused timeline that emphasizes Eat segments.
  */
 function MealTimelineTrack({
-  weekdayLabel,
-  relativeLabel,
+  title,
+  titleSuffix,
   subtitle,
   categories,
   segments,
@@ -60,7 +59,7 @@ function MealTimelineTrack({
         .filter((segment) => segment.categoryId === "eat")
         .map((segment) => ({ segment, assignedMeals: resolveAssignedMeals(meals, segment.assignedMealIds) }))
         .filter((entry) => entry.assignedMeals.length > 0)
-        .sort((a, b) => getMealDaySortKey(a.segment.startSlot) - getMealDaySortKey(b.segment.startSlot)),
+        .sort((a, b) => a.segment.startSlot - b.segment.startSlot),
     [segments, meals]
   );
 
@@ -77,17 +76,17 @@ function MealTimelineTrack({
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-lg font-semibold">
-            <span
-              className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.16em] ${
-                hasUnassignedEatSegment
-                  ? "border-amber-300/50 bg-amber-300/15 text-amber-200"
-                  : "border-app-accent/50 bg-app-accent/15 text-app-accent"
-              }`}
-            >
-              {weekdayLabel}
-            </span>
-            {relativeLabel ? (
-              <span className="text-sm font-medium tracking-wide text-app-muted/90">{relativeLabel}</span>
+            <span>{title}</span>
+            {titleSuffix ? (
+              <span
+                className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.16em] ${
+                  hasUnassignedEatSegment
+                    ? "border-amber-300/50 bg-amber-300/15 text-amber-200"
+                    : "border-app-accent/50 bg-app-accent/15 text-app-accent"
+                }`}
+              >
+                {titleSuffix}
+              </span>
             ) : null}
           </h2>
           <p className="text-sm text-app-muted">{subtitle ?? "Meal-focused read-only view"}</p>
@@ -100,46 +99,10 @@ function MealTimelineTrack({
 
       <div className="overflow-x-auto pb-2">
         <div className="min-w-[72rem] space-y-2">
-          <div className="h-4 px-3 text-[11px] leading-none text-app-muted">
-            <div className="relative h-full">
-              {hourMarks.map((hour) => {
-                const isFirst = hour === 0;
-                const isLast = hour === TOTAL_DAY_SLOTS / 4;
-                const left = `${(hour / (TOTAL_DAY_SLOTS / 4)) * 100}%`;
-
-                return (
-                  <span
-                    key={hour}
-                    className={`absolute top-0 ${isFirst ? "left-0 translate-x-0" : isLast ? "-translate-x-full" : "-translate-x-1/2"}`}
-                    style={{ left: isLast ? "100%" : left }}
-                  >
-                    {formatHourLabel(hour)}
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="px-3">
-            <div
-              className="h-2 rounded-full border-[0.5px] border-app-border/65"
-              style={{
-                backgroundImage:
-                  "repeating-linear-gradient(to right, rgba(154,176,197,0.25) 0, rgba(154,176,197,0.25) 1.5px, transparent 1.5px, transparent calc(100% / 96)), repeating-linear-gradient(to right, rgba(237,246,255,0.55) 0, rgba(237,246,255,0.55) 2px, transparent 2px, transparent calc(100% / 24)), linear-gradient(to right, rgba(20,184,166,0.12), rgba(59,130,246,0.12))"
-              }}
-            />
-          </div>
+          <TimelineHourRuler accentOpacity={0.12} />
 
           <div className="relative h-[6.5rem] rounded-lg border border-app-border bg-app-panel">
-            <div className="absolute inset-x-0 inset-y-3 grid grid-cols-96 overflow-hidden rounded-lg">
-              {quarterHourMarks.map((slot) => {
-                const isHourMark = slot % 4 === 0;
-
-                return (
-                  <div key={slot} className={isHourMark ? "border-l border-app-border/90" : "border-l border-app-border/35"} />
-                );
-              })}
-            </div>
+            <TimelineQuarterHourGrid />
 
             <div className="absolute inset-x-0 inset-y-3 px-3">
               <div className="relative h-full">

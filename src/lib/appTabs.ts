@@ -11,6 +11,14 @@
 /** Registered application tab definitions. */
 export const APP_TABS = [
   {
+    id: "dashboard",
+    label: "Dashboard",
+    kicker: "Weekly Dashboard",
+    description:
+      "A read-only overview of this week's Day Planner and Meal Planner timelines, combining the full category detail with assigned-meal callouts for each day.",
+    contentKind: "dashboard"
+  },
+  {
     id: "day-planner",
     label: "Day Planner",
     kicker: "Daily Timeline Planner",

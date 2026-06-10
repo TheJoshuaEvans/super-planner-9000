@@ -88,15 +88,17 @@ function MonthlyWallCalendar({
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-semibold uppercase tracking-wide">{label}</span>
-                  <button
-                    type="button"
-                    className="rounded border border-app-border bg-app-surface/80 px-1.5 py-0.5 text-[0.58rem] font-semibold uppercase tracking-wide text-app-muted transition hover:border-app-accent/70 hover:text-app-text disabled:cursor-not-allowed disabled:opacity-50"
-                    onClick={() => onPasteWeekday?.(dateKeysByWeekday[weekdayIndex])}
-                    disabled={!canPasteTimeline || !onPasteWeekday || dateKeysByWeekday[weekdayIndex].length === 0}
-                    aria-label={`Paste timeline into all ${label} dates in this month`}
-                  >
-                    Paste
-                  </button>
+                  {onPasteWeekday ? (
+                    <button
+                      type="button"
+                      className="rounded border border-app-border bg-app-surface/80 px-1.5 py-0.5 text-[0.58rem] font-semibold uppercase tracking-wide text-app-muted transition hover:border-app-accent/70 hover:text-app-text disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() => onPasteWeekday(dateKeysByWeekday[weekdayIndex])}
+                      disabled={!canPasteTimeline || dateKeysByWeekday[weekdayIndex].length === 0}
+                      aria-label={`Paste timeline into all ${label} dates in this month`}
+                    >
+                      Paste
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ))}

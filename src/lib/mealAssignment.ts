@@ -1,24 +1,4 @@
-import { SLOTS_PER_HOUR, TOTAL_DAY_SLOTS } from "./timeline";
 import type { Meal } from "../store/mealStore.types";
-
-/**
- * Hour of day at which the meal-planner listing order "starts", so meals
- * scheduled after midnight but before this hour are listed last.
- */
-export const MEAL_DAY_START_HOUR = 6;
-
-const MEAL_DAY_START_SLOT = MEAL_DAY_START_HOUR * SLOTS_PER_HOUR;
-
-/**
- * Computes a sort key for a segment's start slot relative to the meal-planner
- * day start, so times before {@link MEAL_DAY_START_HOUR} sort after times later in the day.
- *
- * @param startSlot - Quarter-hour slot index where the segment starts.
- * @returns Slot offset from the meal-planner day start, in [0, TOTAL_DAY_SLOTS).
- */
-export function getMealDaySortKey(startSlot: number): number {
-  return ((startSlot - MEAL_DAY_START_SLOT) % TOTAL_DAY_SLOTS + TOTAL_DAY_SLOTS) % TOTAL_DAY_SLOTS;
-}
 
 /**
  * Returns a new selection list with the given meal id added or removed.

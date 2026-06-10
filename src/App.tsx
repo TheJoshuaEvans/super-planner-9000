@@ -1,5 +1,6 @@
 import CategoryPalette from "./components/CategoryPalette/CategoryPalette";
 import ConfirmDialog from "./components/ConfirmDialog/ConfirmDialog";
+import DashboardTimelineTrack from "./components/DashboardTimelineTrack/DashboardTimelineTrack";
 import MealAssignmentPanel from "./components/MealAssignmentPanel/MealAssignmentPanel";
 import MealCreator from "./components/MealCreator/MealCreator";
 import MealTimelineTrack from "./components/MealTimelineTrack/MealTimelineTrack";
@@ -15,7 +16,7 @@ import {
   getAppTabDefinition,
   isAppTab
 } from "./lib/appTabs";
-import type { AppTab } from "./lib/appTabs";
+import type { AppTab, AppTabDefinition } from "./lib/appTabs";
 import { formatCalendarDateLabel, getRelativeCalendarDateKey } from "./lib/calendar";
 import { toggleMealSelection } from "./lib/mealAssignment";
 import {
@@ -27,13 +28,13 @@ import {
   formatDashboardDateSubtitle,
   formatDashboardWeekdayLabel,
   formatPasteTargetLabel,
-  getMealPlannerRelativeLabel
+  getRelativeWeekDayLabel
 } from "./lib/plannerViewHelpers";
 import { formatSlotRangeLabelMeridiem } from "./lib/timeline";
 import { useConfirmDialogStore } from "./store/confirmDialogStore";
 import { usePlannerStore } from "./store/plannerStore";
 import { useMealStore } from "./store/mealStore";
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type ReactElement } from "react";
 import { useToastStore } from "./store/toastStore";
 import type { PlannerDateKey, PlannerSegment } from "./store/plannerStore";
 
@@ -55,6 +56,12 @@ const DASHBOARD_TIMELINE_ROWS = [
   { title: "Tomorrow", offset: 1, showCurrentTimeMarker: false },
   { title: "Day after Tomorrow", offset: 2, showCurrentTimeMarker: false }
 ] as const;
+
+/** The Dashboard tab, rendered as its own floating pill set apart from the other tabs. */
+const DASHBOARD_TAB = APP_TABS[0];
+
+/** All tabs other than Dashboard, rendered together in the main tab pill. */
+const OTHER_TABS = APP_TABS.slice(1);
 
 /**
  * Composes the planner page shell from the timeline track and category palette.
@@ -87,12 +94,13 @@ function App() {
   });
 
   const dashboardDateKeys = DASHBOARD_TIMELINE_ROWS.map((row) => getRelativeCalendarDateKey(row.offset));
-  const mealPlannerWeekDateKeys = Array.from({ length: 7 }, (_, offset) => getRelativeCalendarDateKey(offset));
+  const currentWeekDateKeys = Array.from({ length: 7 }, (_, offset) => getRelativeCalendarDateKey(offset));
 
   const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
   const [copiedTimelineSegments, setCopiedTimelineSegments] = useState<PlannerSegment[] | null>(null);
   const [copiedTimelineSourceDateKey, setCopiedTimelineSourceDateKey] = useState<PlannerDateKey | null>(null);
   const [selectedDateKey, setSelectedDateKey] = useState<PlannerDateKey | null>(null);
+  const [selectedMealDateKey, setSelectedMealDateKey] = useState<PlannerDateKey | null>(null);
   const [selectedEatSegment, setSelectedEatSegment] = useState<SelectedEatSegment | null>(null);
   const [pendingMealIds, setPendingMealIds] = useState<string[]>([]);
   const [isPortraitWarningDismissed, setIsPortraitWarningDismissed] = useState<boolean>(() => {
@@ -106,6 +114,8 @@ function App() {
   const canPasteTimeline = copiedTimelineSegments !== null;
   const selectedDateSegments = selectedDateKey ? (segmentsByDate[selectedDateKey] ?? []) : [];
   const selectedDateTitle = selectedDateKey ? formatCalendarDateLabel(selectedDateKey) : "";
+  const selectedMealDateSegments = selectedMealDateKey ? (segmentsByDate[selectedMealDateKey] ?? []) : [];
+  const selectedMealDateTitle = selectedMealDateKey ? formatCalendarDateLabel(selectedMealDateKey) : "";
   const activeTabDefinition = getAppTabDefinition(activeTab);
   const isDayPlannerTab = activeTabDefinition.contentKind === "day-planner";
   const isMealPlannerTab = activeTabDefinition.contentKind === "meal-planner";
@@ -324,6 +334,27 @@ function App() {
   }
 
   /**
+   * Renders a single tab pill button, highlighted when it is the active tab.
+   */
+  function renderTabButton(tab: AppTabDefinition): ReactElement {
+    const isActive = activeTab === tab.id;
+
+    return (
+      <button
+        key={tab.id}
+        type="button"
+        onClick={() => handleSelectTab(tab.id)}
+        className={`rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
+          isActive ? "bg-app-accent text-white shadow-sm" : "text-app-muted hover:text-app-text"
+        }`}
+        aria-pressed={isActive}
+      >
+        {tab.label}
+      </button>
+    );
+  }
+
+  /**
    * Hides the portrait warning overlay for the duration of the current browser session.
    */
   function handleDismissPortraitWarning(): void {
@@ -382,7 +413,7 @@ function App() {
       <ToastViewport />
       <ConfirmDialog />
       <main
-        className={`min-h-screen bg-app-bg px-4 py-5 text-app-text lg:px-6 lg:py-6 ${selectedDateKey || selectedEatSegment ? "pb-[37rem] lg:pb-[39rem]" : "pb-32 lg:pb-36"} ${draggingCategoryId ? "cursor-grabbing" : ""}`}
+        className={`min-h-screen bg-app-bg px-4 py-5 text-app-text lg:px-6 lg:py-6 ${selectedDateKey || selectedMealDateKey || selectedEatSegment ? "pb-[37rem] lg:pb-[39rem]" : "pb-32 lg:pb-36"} ${draggingCategoryId ? "cursor-grabbing" : ""}`}
         onPointerUp={isDayPlannerTab ? () => setDraggingCategoryId(null) : undefined}
       >
         <section className="mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-[96rem] flex-col gap-5 rounded-lg bg-app-panel p-5 shadow-card lg:min-h-[calc(100vh-3rem)] lg:p-6">
@@ -396,24 +427,14 @@ function App() {
             </div>
 
             <div className="flex flex-col items-start gap-3 lg:items-end">
-              <div className="inline-flex rounded-lg border border-app-border bg-app-surface/90 p-1 shadow-sm">
-                {APP_TABS.map((tab) => {
-                  const isActive = activeTab === tab.id;
+              <div className="flex items-center gap-2" role="group" aria-label="App tabs">
+                <div className="inline-flex rounded-lg border border-app-border bg-app-surface/90 p-1 shadow-sm">
+                  {renderTabButton(DASHBOARD_TAB)}
+                </div>
 
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => handleSelectTab(tab.id)}
-                      className={`rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
-                        isActive ? "bg-app-accent text-white shadow-sm" : "text-app-muted hover:text-app-text"
-                      }`}
-                      aria-pressed={isActive}
-                    >
-                      {tab.label}
-                    </button>
-                  );
-                })}
+                <div className="inline-flex rounded-lg border border-app-border bg-app-surface/90 p-1 shadow-sm">
+                  {OTHER_TABS.map(renderTabButton)}
+                </div>
               </div>
 
               <div className="flex items-center gap-2">
@@ -443,7 +464,22 @@ function App() {
             </div>
           </header>
 
-          {activeTabDefinition.contentKind === "day-planner" ? (
+          {activeTabDefinition.contentKind === "dashboard" ? (
+            <section className="flex flex-1 flex-col gap-5">
+              {currentWeekDateKeys.slice(0, 3).map((dateKey, dayOffset) => (
+                <DashboardTimelineTrack
+                  key={dateKey}
+                  weekdayLabel={formatDashboardWeekdayLabel(dateKey)}
+                  relativeLabel={getRelativeWeekDayLabel(dayOffset)}
+                  subtitle={formatDashboardDateSubtitle(dateKey)}
+                  categories={categories}
+                  segments={segmentsByDate[dateKey] ?? []}
+                  meals={meals}
+                  showCurrentTimeMarker={dayOffset === 0}
+                />
+              ))}
+            </section>
+          ) : activeTabDefinition.contentKind === "day-planner" ? (
             <section className="flex flex-1 flex-col gap-5">
               {DASHBOARD_TIMELINE_ROWS.map((row, index) => {
                 const dateKey = dashboardDateKeys[index];
@@ -485,19 +521,29 @@ function App() {
             </section>
           ) : activeTabDefinition.contentKind === "meal-planner" ? (
             <section className="flex flex-1 flex-col gap-5">
-              {mealPlannerWeekDateKeys.map((dateKey, dayOffset) => (
-                <MealTimelineTrack
-                  key={dateKey}
-                  weekdayLabel={formatDashboardWeekdayLabel(dateKey)}
-                  relativeLabel={getMealPlannerRelativeLabel(dayOffset)}
-                  subtitle={formatDashboardDateSubtitle(dateKey)}
-                  categories={categories}
-                  segments={segmentsByDate[dateKey] ?? []}
-                  meals={meals}
-                  showCurrentTimeMarker={dayOffset === 0}
-                  onEatSegmentClick={(segment) => handleMealEatSegmentClick(dateKey, segment)}
-                />
-              ))}
+              {DASHBOARD_TIMELINE_ROWS.map((row, index) => {
+                const dateKey = dashboardDateKeys[index];
+                return (
+                  <MealTimelineTrack
+                    key={dateKey}
+                    title={row.title}
+                    titleSuffix={formatDashboardWeekdayLabel(dateKey)}
+                    subtitle={formatDashboardDateSubtitle(dateKey)}
+                    categories={categories}
+                    segments={segmentsByDate[dateKey] ?? []}
+                    meals={meals}
+                    showCurrentTimeMarker={row.showCurrentTimeMarker}
+                    onEatSegmentClick={(segment) => handleMealEatSegmentClick(dateKey, segment)}
+                  />
+                );
+              })}
+
+              <MonthlyWallCalendar
+                selectedDateKey={selectedMealDateKey}
+                onSelectDate={setSelectedMealDateKey}
+                categories={categories}
+                segmentsByDate={segmentsByDate}
+              />
             </section>
           ) : activeTabDefinition.contentKind === "meal-creator" ? (
             <section className="flex flex-1 flex-col gap-5">
@@ -570,17 +616,45 @@ function App() {
           </section>
         ) : null}
 
-        {isMealPlannerTab && selectedEatSegment ? (
+        {isMealPlannerTab && (selectedMealDateKey || selectedEatSegment) ? (
           <section className="fixed inset-x-0 bottom-0 z-50 px-4 pb-4 lg:px-6 lg:pb-5">
             <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-4 rounded-lg border border-app-border bg-app-surface/95 p-4 shadow-card backdrop-blur">
-              <MealAssignmentPanel
-                contextLabel={selectedEatSegmentLabel}
-                meals={meals}
-                selectedMealIds={pendingMealIds}
-                onToggleMeal={handleToggleAssignedMeal}
-                onSubmit={handleSubmitMealAssignment}
-                onClose={handleCloseMealAssignment}
-              />
+              {selectedMealDateKey ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-app-muted">
+                      Viewing {selectedMealDateTitle}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMealDateKey(null)}
+                      className="rounded-md border border-app-border px-2 py-1 text-xs font-medium text-app-muted transition hover:border-app-text hover:text-app-text"
+                      aria-label="Close selected date meal view"
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  <MealTimelineTrack
+                    title={selectedMealDateTitle}
+                    categories={categories}
+                    segments={selectedMealDateSegments}
+                    meals={meals}
+                    onEatSegmentClick={(segment) => handleMealEatSegmentClick(selectedMealDateKey, segment)}
+                  />
+                </div>
+              ) : null}
+
+              {selectedEatSegment ? (
+                <MealAssignmentPanel
+                  contextLabel={selectedEatSegmentLabel}
+                  meals={meals}
+                  selectedMealIds={pendingMealIds}
+                  onToggleMeal={handleToggleAssignedMeal}
+                  onSubmit={handleSubmitMealAssignment}
+                  onClose={handleCloseMealAssignment}
+                />
+              ) : null}
             </div>
           </section>
         ) : null}

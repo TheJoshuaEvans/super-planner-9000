@@ -9,7 +9,13 @@
       "Read(//tmp/shots/**)",
       "Bash(timeout 15 bash -c 'until tmux capture-pane -t app -p | tail -3 | grep -q \"click-text\"; do sleep 0.5; done')",
       "Bash(tmux kill-session *)",
-      "Edit(/.claude/skills/run-app/**)"
+      "Edit(/.claude/skills/run-app/**)",
+      "Bash(tmux new-session *)",
+      "Bash(timeout 15 bash -c 'until tmux capture-pane -t app -p | grep -q \"driver>\"; do sleep 0.2; done')",
+      "Bash(timeout 30 bash -c 'until tmux capture-pane -t app -p | tail -3 | grep -q launched; do sleep 0.5; done')",
+      "Bash(timeout 15 bash -c 'until tmux capture-pane -t app2 -p | grep -q \"driver>\"; do sleep 0.2; done')",
+      "Bash(timeout 30 bash -c 'until tmux capture-pane -t app2 -p | tail -3 | grep -q launched; do sleep 0.5; done')",
+      "Bash(tmux ls *)"
     ]
   }
 }

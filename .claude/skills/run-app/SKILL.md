@@ -1,6 +1,6 @@
 ---
 name: run-app
-description: Launch and drive Super Planner 9000 in a headless browser to verify UI changes. Use when asked to start the app, take a screenshot of it, or check that a UI change renders/behaves correctly.
+description: Launch and drive Super Planner 9000 in a headless browser to verify UI changes. ONLY use this skill when explicitly asked to perform browser testing. Use when asked to start the app, take a screenshot of it, or check that a UI change renders/behaves correctly.
 ---
 
 Super Planner 9000 is a Vite + React app. For agent/automated use, drive it
