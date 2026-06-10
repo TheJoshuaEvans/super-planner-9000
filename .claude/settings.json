@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(tmux send-keys *)",
+      "Bash(timeout 15 bash -c 'until tmux capture-pane -t app -p | tail -3 | grep -qE \"found:|TIMEOUT:\"; do sleep 0.5; done')",
+      "Bash(tmux capture-pane *)",
+      "Bash(timeout 15 bash -c 'until tmux capture-pane -t app -p | tail -3 | grep -q \"screenshot:\"; do sleep 0.5; done')",
+      "Read(//tmp/shots/**)",
+      "Bash(timeout 15 bash -c 'until tmux capture-pane -t app -p | tail -3 | grep -q \"click-text\"; do sleep 0.5; done')",
+      "Bash(tmux kill-session *)",
+      "Edit(/.claude/skills/run-app/**)"
     ]
   }
 }
