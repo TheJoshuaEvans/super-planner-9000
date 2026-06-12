@@ -53,7 +53,7 @@ export function useGoogleCalendarAuth(): UseGoogleCalendarAuthResult {
       setStatus("signed-in");
       showToast({
         title: "Connected to Google",
-        message: "Signed in with Google Calendar (read-only) access.",
+        message: "Signed in with access to Google Calendar (read-only) and Google Drive app data.",
         level: "success"
       });
     });

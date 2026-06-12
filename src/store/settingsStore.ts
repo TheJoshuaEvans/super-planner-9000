@@ -21,6 +21,8 @@ type SettingsState = {
   googleDriveLastDownloadedAt: string | null;
   /** Whether changes to planner/meal data should be automatically backed up to Drive. Off by default. */
   googleDriveAutoUploadEnabled: boolean;
+  /** Seconds after which toasts auto-dismiss, or `null` to keep them until manually closed (default). */
+  toastAutoDismissSeconds: number | null;
 
   /** Updates the Google Calendar connection status, recording a successful connection. */
   setGoogleCalendarStatus: (status: GoogleCalendarConnectionStatus) => void;
@@ -38,6 +40,8 @@ type SettingsState = {
   setGoogleDriveLastDownloadedAt: (timestamp: string | null) => void;
   /** Toggles automatic Drive backups on planner/meal data changes. */
   setGoogleDriveAutoUploadEnabled: (enabled: boolean) => void;
+  /** Sets the toast auto-dismiss delay in seconds, or `null` to require manual dismissal. */
+  setToastAutoDismissSeconds: (seconds: number | null) => void;
 };
 
 /**
@@ -58,6 +62,7 @@ export const useSettingsStore = create<SettingsState>()(
       googleDriveLastUploadedAt: null,
       googleDriveLastDownloadedAt: null,
       googleDriveAutoUploadEnabled: false,
+      toastAutoDismissSeconds: null,
       setGoogleCalendarStatus: (status) =>
         set((state) => ({
           googleCalendarStatus: status,
@@ -76,7 +81,8 @@ export const useSettingsStore = create<SettingsState>()(
         }),
       setGoogleDriveLastUploadedAt: (timestamp) => set({ googleDriveLastUploadedAt: timestamp }),
       setGoogleDriveLastDownloadedAt: (timestamp) => set({ googleDriveLastDownloadedAt: timestamp }),
-      setGoogleDriveAutoUploadEnabled: (enabled) => set({ googleDriveAutoUploadEnabled: enabled })
+      setGoogleDriveAutoUploadEnabled: (enabled) => set({ googleDriveAutoUploadEnabled: enabled }),
+      setToastAutoDismissSeconds: (seconds) => set({ toastAutoDismissSeconds: seconds })
     }),
     {
       name: "sp9000-settings",
@@ -85,7 +91,8 @@ export const useSettingsStore = create<SettingsState>()(
         googleCalendarConnected: state.googleCalendarConnected,
         googleDriveLastUploadedAt: state.googleDriveLastUploadedAt,
         googleDriveLastDownloadedAt: state.googleDriveLastDownloadedAt,
-        googleDriveAutoUploadEnabled: state.googleDriveAutoUploadEnabled
+        googleDriveAutoUploadEnabled: state.googleDriveAutoUploadEnabled,
+        toastAutoDismissSeconds: state.toastAutoDismissSeconds
       })
     }
   )

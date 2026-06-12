@@ -113,7 +113,7 @@ export function buildShoppingListPrintHtml(items: ShoppingListItem[], dateRangeL
         display: flex;
         align-items: baseline;
         gap: 0.75rem;
-        font-size: 1.6rem;
+        font-size: 1.4rem;
         line-height: 2.4rem;
         break-inside: avoid;
       }
@@ -128,7 +128,7 @@ export function buildShoppingListPrintHtml(items: ShoppingListItem[], dateRangeL
       }
       .amount {
         color: #5b6b7a;
-        font-size: 1.3rem;
+        font-size: 1.1rem;
       }
       .empty {
         color: #5b6b7a;

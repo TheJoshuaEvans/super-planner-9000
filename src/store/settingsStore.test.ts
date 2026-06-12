@@ -82,7 +82,8 @@ describe("settingsStore", () => {
       googleCalendarConnected: true,
       googleDriveLastUploadedAt: null,
       googleDriveLastDownloadedAt: null,
-      googleDriveAutoUploadEnabled: false
+      googleDriveAutoUploadEnabled: false,
+      toastAutoDismissSeconds: null
     });
   });
 
@@ -108,5 +109,15 @@ describe("settingsStore", () => {
 
     useSettingsStore.getState().setGoogleDriveAutoUploadEnabled(false);
     expect(useSettingsStore.getState().googleDriveAutoUploadEnabled).toBe(false);
+  });
+
+  it("defaults toasts to manual dismissal and allows setting/clearing an auto-dismiss delay", () => {
+    expect(useSettingsStore.getState().toastAutoDismissSeconds).toBeNull();
+
+    useSettingsStore.getState().setToastAutoDismissSeconds(5);
+    expect(useSettingsStore.getState().toastAutoDismissSeconds).toBe(5);
+
+    useSettingsStore.getState().setToastAutoDismissSeconds(null);
+    expect(useSettingsStore.getState().toastAutoDismissSeconds).toBeNull();
   });
 });

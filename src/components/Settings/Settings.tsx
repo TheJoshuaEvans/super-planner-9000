@@ -1,6 +1,7 @@
 import type { ChangeEvent } from "react";
 import GoogleCalendarPanel from "./GoogleCalendarPanel";
 import GoogleDrivePanel from "./GoogleDrivePanel";
+import NotificationsPanel from "./NotificationsPanel";
 import PlannerDataPanel from "./PlannerDataPanel";
 
 type SettingsProps = {
@@ -9,7 +10,8 @@ type SettingsProps = {
 };
 
 /**
- * Settings page: Google Calendar integration, planner data import/export, and future settings.
+ * Settings page: Google Calendar integration, planner data import/export, Drive cloud backup,
+ * and notification preferences.
  */
 function Settings({ onExportPlannerData, onImportFileChange }: SettingsProps) {
   return (
@@ -20,7 +22,7 @@ function Settings({ onExportPlannerData, onImportFileChange }: SettingsProps) {
 
       <GoogleDrivePanel />
 
-      {/* Future settings sections go here */}
+      <NotificationsPanel />
     </section>
   );
 }
