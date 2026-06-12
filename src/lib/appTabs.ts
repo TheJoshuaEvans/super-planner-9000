@@ -36,7 +36,7 @@ export const APP_TABS = [
     id: "about",
     label: "About",
     kicker: "About This App",
-    description: "Learn about the app's purpose, features, and development roadmap.",
+    description: "Learn about the app's purpose and features.",
     contentKind: "about"
   }
 ] as const;
