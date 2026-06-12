@@ -418,14 +418,25 @@ function App() {
               <p className="max-w-3xl text-sm text-app-muted sm:text-base">{activeTabDefinition.description}</p>
             </div>
 
-            <div className="flex items-center gap-2" role="group" aria-label="App tabs">
-              <div className="inline-flex rounded-lg border border-app-border bg-app-surface/90 p-1 shadow-sm">
-                {renderTabButton(DASHBOARD_TAB)}
+            <div className="flex flex-col items-start gap-3 lg:items-end">
+              <div className="flex items-center gap-2" role="group" aria-label="App tabs">
+                <div className="inline-flex rounded-lg border border-app-border bg-app-surface/90 p-1 shadow-sm">
+                  {renderTabButton(DASHBOARD_TAB)}
+                </div>
+
+                <div className="inline-flex rounded-lg border border-app-border bg-app-surface/90 p-1 shadow-sm">
+                  {OTHER_TABS.map(renderTabButton)}
+                </div>
               </div>
 
-              <div className="inline-flex rounded-lg border border-app-border bg-app-surface/90 p-1 shadow-sm">
-                {OTHER_TABS.map(renderTabButton)}
-              </div>
+              {isDashboardTab ? (
+                <PlannerHistoryControls
+                  canUndo={canUndoPlannerEdit}
+                  canRedo={canRedoPlannerEdit}
+                  onUndo={undoPlannerEdit}
+                  onRedo={redoPlannerEdit}
+                />
+              ) : null}
             </div>
           </header>
 
@@ -508,15 +519,6 @@ function App() {
         {isDashboardTab ? (
           <section className="fixed inset-x-0 bottom-0 z-50 px-4 pb-4 lg:px-6 lg:pb-5">
             <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-4 rounded-lg border border-app-border bg-app-surface/95 p-4 shadow-card backdrop-blur">
-              <div className="flex items-center justify-end">
-                <PlannerHistoryControls
-                  canUndo={canUndoPlannerEdit}
-                  canRedo={canRedoPlannerEdit}
-                  onUndo={undoPlannerEdit}
-                  onRedo={redoPlannerEdit}
-                />
-              </div>
-
               {selectedDateKey ? (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">

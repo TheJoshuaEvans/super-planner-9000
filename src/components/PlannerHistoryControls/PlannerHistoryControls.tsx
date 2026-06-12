@@ -8,7 +8,7 @@ type PlannerHistoryControlsProps = {
 };
 
 /**
- * Compact Day Planner history controls for the floating dock card.
+ * Compact undo/redo controls for the planner's edit history.
  */
 function PlannerHistoryControls({ canUndo, canRedo, onUndo, onRedo }: PlannerHistoryControlsProps) {
   return (
