@@ -20,9 +20,10 @@ function GoogleCalendarPanel() {
   return (
     <section className="space-y-3 rounded-lg border border-app-border bg-app-surface/70 p-4">
       <div className="space-y-1">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-app-muted">Google Calendar</h3>
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-app-muted">Google Account</h3>
         <p className="text-sm text-app-text">
-          Connect your Google account to give read-only access to Google Calendar.
+          Connect your Google account to give read-only access to Google Calendar, plus limited access to a private
+          Google Drive folder for cloud backups.
         </p>
       </div>
 
@@ -33,7 +34,7 @@ function GoogleCalendarPanel() {
               Connected
             </span>
             <button type="button" onClick={testConnection} disabled={isTestingConnection} className={PRIMARY_BUTTON_CLASSES}>
-              {isTestingConnection ? "Testing…" : "Test Calendar Connection"}
+              {isTestingConnection ? "Testing…" : "Test Connection"}
             </button>
             <button type="button" onClick={signOut} className={SECONDARY_BUTTON_CLASSES}>
               Disconnect

@@ -1,5 +1,6 @@
 import type { ChangeEvent } from "react";
 import GoogleCalendarPanel from "./GoogleCalendarPanel";
+import GoogleDrivePanel from "./GoogleDrivePanel";
 import PlannerDataPanel from "./PlannerDataPanel";
 
 type SettingsProps = {
@@ -17,11 +18,9 @@ function Settings({ onExportPlannerData, onImportFileChange }: SettingsProps) {
 
       <PlannerDataPanel onExport={onExportPlannerData} onImportFileChange={onImportFileChange} />
 
-      <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-app-border bg-app-surface/70 px-6 py-16 text-center">
-        <div className="max-w-md space-y-2">
-          <h2 className="text-2xl font-semibold tracking-tight">More settings coming soon</h2>
-        </div>
-      </div>
+      <GoogleDrivePanel />
+
+      {/* Future settings sections go here */}
     </section>
   );
 }

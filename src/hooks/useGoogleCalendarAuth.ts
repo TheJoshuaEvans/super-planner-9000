@@ -21,7 +21,7 @@ export type UseGoogleCalendarAuthResult = {
  *
  * Connection status, the access token, its expiry, and any error are stored in the global
  * `settingsStore` so other parts of the app (e.g. timeline views) can read them, and so the
- * global "Reconnect Google Calendar" control can prompt for `signIn` again once the token
+ * global "Reconnect Google Account" control can prompt for `signIn` again once the token
  * expires.
  *
  * @returns The current auth status/error plus sign-in, sign-out, and test-connection actions.

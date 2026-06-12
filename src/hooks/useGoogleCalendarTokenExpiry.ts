@@ -7,7 +7,7 @@ import { useSettingsStore } from "../store/settingsStore";
  * (or is about to). Google's token client always opens a popup — even for "silent" refresh
  * attempts — so background tabs/timers can't refresh the token automatically; instead, this
  * hook flips the status back to "signed-out" (keeping `googleCalendarConnected` true) so the
- * global "Reconnect Google Calendar" control appears and a single click restores access.
+ * global "Reconnect Google Account" control appears and a single click restores access.
  *
  * A scheduled timeout handles the common case where the tab stays active. A
  * `visibilitychange` listener catches tokens that expired while the tab was suspended by a

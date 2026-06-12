@@ -2,10 +2,14 @@ import { GoogleCalendarApiError } from "./googleCalendarApi";
 import { useSettingsStore } from "../store/settingsStore";
 
 /**
- * Runs a Google Calendar API request using the current access token. If the request fails
- * with a 401 — e.g. because the token expired while the tab was asleep — marks the
- * connection as needing reconnection (without clearing `googleCalendarConnected`), so the
- * global "Reconnect Google Calendar" control appears, then rethrows the original error.
+ * Runs a Google API request using the current access token. If the request fails with a 401
+ * — e.g. because the token expired while the tab was asleep — marks the connection as needing
+ * reconnection (without clearing `googleCalendarConnected`), so the global "Reconnect Google
+ * Calendar" control appears, then rethrows the original error.
+ *
+ * Despite the name, this is also used for Google Drive requests: the shared token is requested
+ * with combined Calendar + Drive scopes (see `GOOGLE_OAUTH_SCOPES`), so one connection covers
+ * both APIs.
  *
  * @param request - Performs the API call given a valid access token.
  * @returns The result of `request`.

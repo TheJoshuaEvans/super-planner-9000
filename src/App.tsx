@@ -11,6 +11,7 @@ import ToastViewport from "./components/ToastViewport/ToastViewport";
 import TimelineTrack from "./components/TimelineTrack/TimelineTrack";
 import type { CrossDragPreview } from "./components/TimelineTrack/timelineTrackInteractions";
 import { useGoogleCalendarTokenExpiry } from "./hooks/useGoogleCalendarTokenExpiry";
+import { useGoogleDriveAutoUpload } from "./hooks/useGoogleDriveAutoUpload";
 import { usePlannerUndoRedoHotkeys } from "./hooks/usePlannerUndoRedoHotkeys";
 import { useTodayDateKey } from "./hooks/useTodayDateKey";
 import {
@@ -124,6 +125,7 @@ function App() {
   });
 
   useGoogleCalendarTokenExpiry();
+  useGoogleDriveAutoUpload();
 
   /**
    * Exports the current planner state to a JSON file.

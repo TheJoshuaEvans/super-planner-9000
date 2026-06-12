@@ -15,6 +15,12 @@ type SettingsState = {
   googleCalendarTokenExpiresAt: number | null;
   /** Latest Google Calendar connection error message, if any. Not persisted. */
   googleCalendarError: string | null;
+  /** ISO timestamp of the last successful "Upload to Drive" backup, if any. */
+  googleDriveLastUploadedAt: string | null;
+  /** ISO timestamp of the last successful "Download from Drive" restore, if any. */
+  googleDriveLastDownloadedAt: string | null;
+  /** Whether changes to planner/meal data should be automatically backed up to Drive. Off by default. */
+  googleDriveAutoUploadEnabled: boolean;
 
   /** Updates the Google Calendar connection status, recording a successful connection. */
   setGoogleCalendarStatus: (status: GoogleCalendarConnectionStatus) => void;
@@ -26,6 +32,12 @@ type SettingsState = {
   setGoogleCalendarError: (error: string | null) => void;
   /** Fully disconnects Google Calendar, including the persisted "previously connected" flag. */
   disconnectGoogleCalendar: () => void;
+  /** Records the timestamp of the most recent successful Drive backup upload. */
+  setGoogleDriveLastUploadedAt: (timestamp: string | null) => void;
+  /** Records the timestamp of the most recent successful Drive backup download. */
+  setGoogleDriveLastDownloadedAt: (timestamp: string | null) => void;
+  /** Toggles automatic Drive backups on planner/meal data changes. */
+  setGoogleDriveAutoUploadEnabled: (enabled: boolean) => void;
 };
 
 /**
@@ -43,6 +55,9 @@ export const useSettingsStore = create<SettingsState>()(
       googleCalendarAccessToken: null,
       googleCalendarTokenExpiresAt: null,
       googleCalendarError: null,
+      googleDriveLastUploadedAt: null,
+      googleDriveLastDownloadedAt: null,
+      googleDriveAutoUploadEnabled: false,
       setGoogleCalendarStatus: (status) =>
         set((state) => ({
           googleCalendarStatus: status,
@@ -58,12 +73,20 @@ export const useSettingsStore = create<SettingsState>()(
           googleCalendarAccessToken: null,
           googleCalendarTokenExpiresAt: null,
           googleCalendarError: null
-        })
+        }),
+      setGoogleDriveLastUploadedAt: (timestamp) => set({ googleDriveLastUploadedAt: timestamp }),
+      setGoogleDriveLastDownloadedAt: (timestamp) => set({ googleDriveLastDownloadedAt: timestamp }),
+      setGoogleDriveAutoUploadEnabled: (enabled) => set({ googleDriveAutoUploadEnabled: enabled })
     }),
     {
       name: "sp9000-settings",
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ googleCalendarConnected: state.googleCalendarConnected })
+      partialize: (state) => ({
+        googleCalendarConnected: state.googleCalendarConnected,
+        googleDriveLastUploadedAt: state.googleDriveLastUploadedAt,
+        googleDriveLastDownloadedAt: state.googleDriveLastDownloadedAt,
+        googleDriveAutoUploadEnabled: state.googleDriveAutoUploadEnabled
+      })
     }
   )
 );

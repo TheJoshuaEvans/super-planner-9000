@@ -25,7 +25,7 @@ function GoogleCalendarReconnectButton() {
       disabled={isConnecting}
       className="rounded-md border border-amber-400/60 bg-amber-500/15 px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-amber-100 transition hover:border-amber-300 hover:bg-amber-500/25 disabled:cursor-not-allowed disabled:opacity-60"
     >
-      {isConnecting ? "Reconnecting…" : "Reconnect Google Calendar"}
+      {isConnecting ? "Reconnecting…" : "Reconnect Google Account"}
     </button>
   );
 }

@@ -1,4 +1,4 @@
-import { GOOGLE_CALENDAR_READONLY_SCOPE, GOOGLE_OAUTH_CLIENT_ID } from "./googleAuthConfig";
+import { GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_SCOPES } from "./googleAuthConfig";
 import { loadGoogleIdentityScript } from "./googleIdentityScript";
 
 let tokenClient: GoogleOAuth2TokenClient | null = null;
@@ -18,7 +18,7 @@ async function getTokenClient(): Promise<GoogleOAuth2TokenClient> {
   if (!tokenClient) {
     tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: GOOGLE_OAUTH_CLIENT_ID,
-      scope: GOOGLE_CALENDAR_READONLY_SCOPE,
+      scope: GOOGLE_OAUTH_SCOPES,
       callback: (response) => activeCallback?.(response)
     });
   }
