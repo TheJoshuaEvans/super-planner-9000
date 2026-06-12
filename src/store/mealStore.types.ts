@@ -7,11 +7,12 @@ export type MealComponent = {
 };
 
 /**
- * A single ingredient reference within a meal, with a free-text quantity.
+ * A single ingredient reference within a meal, with a numeric quantity and free-text unit.
  */
 export type MealIngredient = {
   componentId: string;
-  quantity: string;
+  quantity: number;
+  unit: string;
 };
 
 /**

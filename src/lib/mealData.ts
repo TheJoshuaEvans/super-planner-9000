@@ -55,6 +55,20 @@ export function isComponentNameTaken(
 }
 
 /**
+ * Normalizes an ingredient's quantity (clamped to non-negative) and unit (trimmed, lowercased).
+ *
+ * @param ingredient - Raw ingredient values from the meal form.
+ * @returns A normalized MealIngredient.
+ */
+function normalizeIngredient(ingredient: MealIngredient): MealIngredient {
+  return {
+    componentId: ingredient.componentId,
+    quantity: Math.max(0, ingredient.quantity),
+    unit: ingredient.unit.trim().toLowerCase()
+  };
+}
+
+/**
  * Creates a new Meal with a generated id.
  *
  * @param name - Display name for the meal.
@@ -67,7 +81,7 @@ export function createMeal(name: string, description: string, ingredients: MealI
     id: createId("meal"),
     name: name.trim(),
     description: description.trim(),
-    ingredients: ingredients.map((i) => ({ ...i, quantity: i.quantity.toLowerCase() }))
+    ingredients: ingredients.map(normalizeIngredient)
   };
 }
 
@@ -134,7 +148,7 @@ export function updateMealInList(
           ...meal,
           name: name.trim(),
           description: description.trim(),
-          ingredients: ingredients.map((i) => ({ ...i, quantity: i.quantity.toLowerCase() }))
+          ingredients: ingredients.map(normalizeIngredient)
         }
       : meal
   );

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { resolveAssignedMeals } from "../../lib/mealAssignment";
 import {
   formatClockTimeLabel,
@@ -38,6 +38,7 @@ function DashboardTimelineTrack({
   showCurrentTimeMarker = false
 }: DashboardTimelineTrackProps) {
   const currentTime = useTimelineMarkerClock({ enabled: showCurrentTimeMarker });
+  const trackRef = useRef<HTMLDivElement | null>(null);
 
   const categoriesById = useMemo(
     () => new Map(categories.map((category) => [category.id, category])),
@@ -90,7 +91,7 @@ function DashboardTimelineTrack({
             <TimelineQuarterHourGrid />
 
             <div className="absolute inset-x-0 inset-y-3 px-3">
-              <div className="relative h-full">
+              <div ref={trackRef} className="relative h-full">
                 {showCurrentTimeMarker ? (
                   <div
                     className="pointer-events-none absolute inset-y-0 z-30"
@@ -137,6 +138,7 @@ function DashboardTimelineTrack({
                           backgroundColor: category?.color ?? "#475569",
                           zIndex: 1
                         }}
+                        boundaryRef={trackRef}
                       >
                         <div className="flex h-full w-full flex-col justify-start gap-0.5 overflow-hidden px-3 py-2">
                           <span className="truncate text-sm font-semibold">{segmentLabel}</span>

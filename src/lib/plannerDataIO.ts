@@ -3,7 +3,7 @@ import type { PlannerCategory, PlannerPersistedData, PlannerSegment, PlannerSegm
 import type { Meal, MealComponent, MealIngredient, MealPersistedData } from "../store/mealStore.types";
 
 export const PLANNER_DATA_EXPORT_APP = "super-planner-9000" as const;
-export const PLANNER_DATA_EXPORT_VERSION = 2 as const;
+export const PLANNER_DATA_EXPORT_VERSION = 3 as const;
 
 export type PlannerDataExportEnvelope = {
   app: typeof PLANNER_DATA_EXPORT_APP;
@@ -133,7 +133,12 @@ function isMealComponent(value: unknown): value is MealComponent {
  * @returns Whether the value matches MealIngredient fields.
  */
 function isMealIngredient(value: unknown): value is MealIngredient {
-  return isPlainObject(value) && isString(value.componentId) && isString(value.quantity);
+  return (
+    isPlainObject(value) &&
+    isString(value.componentId) &&
+    isNumber(value.quantity) &&
+    isString(value.unit)
+  );
 }
 
 /**
@@ -217,7 +222,8 @@ function normalizeMealPersistedData(meals: MealPersistedData): MealPersistedData
       description: meal.description,
       ingredients: meal.ingredients.map((ingredient) => ({
         componentId: ingredient.componentId,
-        quantity: ingredient.quantity
+        quantity: ingredient.quantity,
+        unit: ingredient.unit
       }))
     }))
   };

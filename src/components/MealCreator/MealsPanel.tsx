@@ -17,7 +17,7 @@ const secondaryButtonClassName =
  *
  * @param meal - The meal to summarise.
  * @param componentsById - Lookup map from component id to component.
- * @returns A comma-separated list of "Name (quantity)" strings, or "No ingredients".
+ * @returns A comma-separated list of "Name (quantity unit)" strings, or "No ingredients".
  */
 function formatIngredientSummary(
   meal: Meal,
@@ -29,7 +29,9 @@ function formatIngredientSummary(
     .map((ingredient) => {
       const component = componentsById.get(ingredient.componentId);
       if (!component) return null;
-      return ingredient.quantity ? `${component.name} (${ingredient.quantity})` : component.name;
+      if (ingredient.quantity <= 0) return component.name;
+      const amount = ingredient.unit ? `${ingredient.quantity} ${ingredient.unit}` : `${ingredient.quantity}`;
+      return `${component.name} (${amount})`;
     })
     .filter((part): part is string => part !== null);
 
@@ -94,7 +96,11 @@ function MealsPanel() {
       mealEditingId: meal.id,
       mealFormName: meal.name,
       mealFormDescription: meal.description,
-      mealFormIngredients: meal.ingredients.map((i) => ({ ...i })),
+      mealFormIngredients: meal.ingredients.map((i) => ({
+        componentId: i.componentId,
+        quantity: i.quantity > 0 ? String(i.quantity) : "",
+        unit: i.unit,
+      })),
     });
   }
 
@@ -115,7 +121,7 @@ function MealsPanel() {
    * Appends a blank ingredient row to the form.
    */
   function handleAddIngredientRow(): void {
-    setForm({ mealFormIngredients: [...formIngredients, { componentId: "", quantity: "" }] });
+    setForm({ mealFormIngredients: [...formIngredients, { componentId: "", quantity: "", unit: "" }] });
   }
 
   /**
@@ -127,7 +133,7 @@ function MealsPanel() {
    */
   function handleIngredientChange(
     index: number,
-    field: "componentId" | "quantity",
+    field: "componentId" | "quantity" | "unit",
     value: string
   ): void {
     setForm({
@@ -156,7 +162,11 @@ function MealsPanel() {
     if (!canSave) return;
     const ingredients: MealIngredient[] = formIngredients
       .filter((row) => row.componentId !== "")
-      .map(({ componentId, quantity }) => ({ componentId, quantity }));
+      .map(({ componentId, quantity, unit }) => ({
+        componentId,
+        quantity: Number(quantity) || 0,
+        unit,
+      }));
     if (mode === "add") {
       addMeal(formName, formDescription, ingredients);
     } else if (mode === "edit" && editingId) {
@@ -229,12 +239,23 @@ function MealsPanel() {
                       ))}
                     </select>
                     <input
-                      type="text"
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="any"
                       aria-label={`Ingredient ${index + 1} quantity`}
-                      placeholder="Quantity"
+                      placeholder="Qty"
                       value={row.quantity}
                       onChange={(e) => handleIngredientChange(index, "quantity", e.target.value)}
-                      className="w-28 rounded-md border border-app-border bg-app-bg px-2 py-2 text-sm text-app-text placeholder:text-app-muted/60 focus:border-app-accent/60 focus:outline-none focus:ring-2 focus:ring-app-accent/20"
+                      className="w-16 rounded-md border border-app-border bg-app-bg px-2 py-2 text-sm text-app-text placeholder:text-app-muted/60 focus:border-app-accent/60 focus:outline-none focus:ring-2 focus:ring-app-accent/20"
+                    />
+                    <input
+                      type="text"
+                      aria-label={`Ingredient ${index + 1} unit`}
+                      placeholder="Unit"
+                      value={row.unit}
+                      onChange={(e) => handleIngredientChange(index, "unit", e.target.value)}
+                      className="w-24 rounded-md border border-app-border bg-app-bg px-2 py-2 text-sm text-app-text placeholder:text-app-muted/60 focus:border-app-accent/60 focus:outline-none focus:ring-2 focus:ring-app-accent/20"
                     />
                     <button
                       type="button"

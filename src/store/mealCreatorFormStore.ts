@@ -4,7 +4,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 export type PanelMode = "list" | "add" | "edit";
 
 /** A single row in the meal ingredient form — componentId may be empty until the user selects one. */
-export type IngredientRow = { componentId: string; quantity: string };
+export type IngredientRow = { componentId: string; quantity: string; unit: string };
 
 type ComponentFormSlice = {
   componentMode: PanelMode;

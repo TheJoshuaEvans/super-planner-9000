@@ -45,8 +45,8 @@ describe("mealStore", () => {
       useMealStore.getState().addComponent("Lettuce");
       const [chicken, lettuce] = useMealStore.getState().components;
       useMealStore.getState().addMeal("Salad", "", [
-        { componentId: chicken.id, quantity: "200g" },
-        { componentId: lettuce.id, quantity: "1 cup" }
+        { componentId: chicken.id, quantity: 200, unit: "g" },
+        { componentId: lettuce.id, quantity: 1, unit: "cup" }
       ]);
       useMealStore.getState().deleteComponent(chicken.id);
       const meal = useMealStore.getState().meals[0];
@@ -71,21 +71,21 @@ describe("mealStore", () => {
     it("adds a meal with ingredients", () => {
       useMealStore.getState().addComponent("Chicken");
       const componentId = useMealStore.getState().components[0].id;
-      useMealStore.getState().addMeal("Grilled Chicken", "", [{ componentId, quantity: "200g" }]);
+      useMealStore.getState().addMeal("Grilled Chicken", "", [{ componentId, quantity: 200, unit: "g" }]);
       const meal = useMealStore.getState().meals[0];
       expect(meal.ingredients).toHaveLength(1);
-      expect(meal.ingredients[0]).toEqual({ componentId, quantity: "200g" });
+      expect(meal.ingredients[0]).toEqual({ componentId, quantity: 200, unit: "g" });
     });
 
     it("updates a meal in place", () => {
       useMealStore.getState().addMeal("Salad", "", []);
       const { id } = useMealStore.getState().meals[0];
-      useMealStore.getState().updateMeal(id, "Big Salad", "Very filling", [{ componentId: "c1", quantity: "200g" }]);
+      useMealStore.getState().updateMeal(id, "Big Salad", "Very filling", [{ componentId: "c1", quantity: 200, unit: "g" }]);
       expect(useMealStore.getState().meals[0]).toMatchObject({
         id,
         name: "Big Salad",
         description: "Very filling",
-        ingredients: [{ componentId: "c1", quantity: "200g" }]
+        ingredients: [{ componentId: "c1", quantity: 200, unit: "g" }]
       });
     });
 

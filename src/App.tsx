@@ -7,6 +7,7 @@ import MealTimelineTrack from "./components/MealTimelineTrack/MealTimelineTrack"
 import MonthlyWallCalendar from "./components/MonthlyWallCalendar/MonthlyWallCalendar";
 import PlannerHistoryControls from "./components/PlannerHistoryControls/PlannerHistoryControls";
 import PortraitWarningOverlay from "./components/PortraitWarningOverlay/PortraitWarningOverlay";
+import ShoppingListPanel from "./components/ShoppingListPanel/ShoppingListPanel";
 import ToastViewport from "./components/ToastViewport/ToastViewport";
 import TimelineTrack from "./components/TimelineTrack/TimelineTrack";
 import { usePlannerUndoRedoHotkeys } from "./hooks/usePlannerUndoRedoHotkeys";
@@ -478,6 +479,8 @@ function App() {
                   showCurrentTimeMarker={dayOffset === 0}
                 />
               ))}
+
+              <ShoppingListPanel />
             </section>
           ) : activeTabDefinition.contentKind === "day-planner" ? (
             <section className="flex flex-1 flex-col gap-5">
@@ -544,6 +547,8 @@ function App() {
                 categories={categories}
                 segmentsByDate={segmentsByDate}
               />
+
+              <ShoppingListPanel />
             </section>
           ) : activeTabDefinition.contentKind === "meal-creator" ? (
             <section className="flex flex-1 flex-col gap-5">

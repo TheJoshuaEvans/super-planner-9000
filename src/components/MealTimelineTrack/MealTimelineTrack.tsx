@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { resolveAssignedMeals } from "../../lib/mealAssignment";
 import {
   formatClockTimeLabel,
@@ -39,6 +39,7 @@ function MealTimelineTrack({
   onEatSegmentClick
 }: MealTimelineTrackProps) {
   const currentTime = useTimelineMarkerClock({ enabled: showCurrentTimeMarker });
+  const trackRef = useRef<HTMLDivElement | null>(null);
 
   const categoriesById = useMemo(
     () => new Map(categories.map((category) => [category.id, category])),
@@ -105,7 +106,7 @@ function MealTimelineTrack({
             <TimelineQuarterHourGrid />
 
             <div className="absolute inset-x-0 inset-y-3 px-3">
-              <div className="relative h-full">
+              <div ref={trackRef} className="relative h-full">
                 {showCurrentTimeMarker ? (
                   <div
                     className="pointer-events-none absolute inset-y-0 z-30"
@@ -153,6 +154,7 @@ function MealTimelineTrack({
                         width,
                         zIndex: isEatSegment ? 2 : 1
                       }}
+                      boundaryRef={trackRef}
                     >
                       <button
                         type="button"

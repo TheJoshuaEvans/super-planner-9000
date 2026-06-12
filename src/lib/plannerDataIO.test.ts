@@ -28,7 +28,7 @@ const sampleMealData = {
       id: "meal-1",
       name: "Grilled Chicken",
       description: "Simple and healthy",
-      ingredients: [{ componentId: "component-1", quantity: "200g" }]
+      ingredients: [{ componentId: "component-1", quantity: 200, unit: "g" }]
     }
   ]
 };
@@ -51,7 +51,7 @@ describe("plannerDataIO", () => {
     const text = serializePlannerDataExport(samplePlannerData, sampleMealData, new Date("2026-06-09T12:34:56.000Z"));
 
     expect(text).toContain("\n  \"app\": \"super-planner-9000\",");
-    expect(text).toContain("\n  \"version\": 2,");
+    expect(text).toContain("\n  \"version\": 3,");
     expect(text).toContain("\n  \"data\": {");
     expect(text).toContain("\n  \"meals\": {");
   });

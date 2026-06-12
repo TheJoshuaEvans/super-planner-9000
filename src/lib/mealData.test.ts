@@ -54,7 +54,7 @@ describe("createComponent", () => {
 
 describe("createMeal", () => {
   it("creates a meal with the given name trimmed", () => {
-    const ingredients = [{ componentId: "c1", quantity: "200g" }];
+    const ingredients = [{ componentId: "c1", quantity: 200, unit: "g" }];
     const meal = createMeal("chicken salad", "A light lunch", ingredients);
     expect(meal.name).toBe("chicken salad");
     expect(meal.description).toBe("A light lunch");
@@ -67,10 +67,18 @@ describe("createMeal", () => {
     expect(meal.description).toBe("Quick dinner");
   });
 
-  it("lowercases ingredient quantities", () => {
-    const meal = createMeal("Salad", "", [{ componentId: "c1", quantity: "200G" }, { componentId: "c2", quantity: "1 CUP" }]);
-    expect(meal.ingredients[0].quantity).toBe("200g");
-    expect(meal.ingredients[1].quantity).toBe("1 cup");
+  it("trims and lowercases ingredient units", () => {
+    const meal = createMeal("Salad", "", [
+      { componentId: "c1", quantity: 200, unit: "G" },
+      { componentId: "c2", quantity: 1, unit: " CUP " }
+    ]);
+    expect(meal.ingredients[0]).toEqual({ componentId: "c1", quantity: 200, unit: "g" });
+    expect(meal.ingredients[1]).toEqual({ componentId: "c2", quantity: 1, unit: "cup" });
+  });
+
+  it("clamps negative ingredient quantities to zero", () => {
+    const meal = createMeal("Salad", "", [{ componentId: "c1", quantity: -5, unit: "g" }]);
+    expect(meal.ingredients[0].quantity).toBe(0);
   });
 
   it("assigns unique ids to distinct calls", () => {
@@ -150,15 +158,15 @@ describe("removeComponentFromState", () => {
       name: "Chicken Salad",
       description: "",
       ingredients: [
-        { componentId: "c1", quantity: "200g" },
-        { componentId: "c2", quantity: "1 cup" }
+        { componentId: "c1", quantity: 200, unit: "g" },
+        { componentId: "c2", quantity: 1, unit: "cup" }
       ]
     },
     {
       id: "m2",
       name: "Lettuce Wrap",
       description: "",
-      ingredients: [{ componentId: "c2", quantity: "2 leaves" }]
+      ingredients: [{ componentId: "c2", quantity: 2, unit: "leaves" }]
     }
   ];
 
@@ -189,17 +197,17 @@ describe("removeComponentFromState", () => {
 
 describe("updateMealInList", () => {
   const meals: Meal[] = [
-    { id: "m1", name: "Salad", description: "Light", ingredients: [{ componentId: "c1", quantity: "100g" }] },
+    { id: "m1", name: "Salad", description: "Light", ingredients: [{ componentId: "c1", quantity: 100, unit: "g" }] },
     { id: "m2", name: "Soup", description: "", ingredients: [] }
   ];
 
-  it("updates the matching meal with trimmed name and lowercased quantities", () => {
-    const updated = updateMealInList(meals, "m1", "big salad", "Very filling", [{ componentId: "c2", quantity: "200G" }]);
+  it("updates the matching meal with trimmed name and normalized ingredient units", () => {
+    const updated = updateMealInList(meals, "m1", "big salad", "Very filling", [{ componentId: "c2", quantity: 200, unit: "G" }]);
     expect(updated[0]).toEqual({
       id: "m1",
       name: "big salad",
       description: "Very filling",
-      ingredients: [{ componentId: "c2", quantity: "200g" }]
+      ingredients: [{ componentId: "c2", quantity: 200, unit: "g" }]
     });
   });
 
