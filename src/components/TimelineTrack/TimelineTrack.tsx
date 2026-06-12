@@ -9,9 +9,12 @@ import {
   TOTAL_DAY_SLOTS
 } from "../../lib/timeline";
 import { resolveCurrentTimePercent } from "../../lib/timelineNow";
+import { hasUnassignedEatSegment, resolveAssignedMeals, resolveEatSegmentsWithAssignedMeals } from "../../lib/mealAssignment";
 import { useTimelineMarkerClock } from "../../hooks/useTimelineMarkerClock";
+import type { Meal } from "../../store/mealStore.types";
 import type { PlannerCategory, PlannerSegment } from "../../store/plannerStore";
 import {
+  isClickInteraction,
   isPointerInRect,
   resolveDropPreviewSlot,
   resolveMoveStart,
@@ -28,11 +31,12 @@ import Tooltip from "../Tooltip/Tooltip";
 
 type TimelineTrackProps = {
   dateKey: string;
-  title: string;
+  title?: string;
   titleSuffix?: string;
   subtitle?: string;
   categories: PlannerCategory[];
   segments: PlannerSegment[];
+  meals?: Meal[];
   canPasteTimeline: boolean;
   draggingCategoryId: string | null;
   onMoveSegment: (segmentId: string, nextStartSlot: number) => void;
@@ -42,6 +46,7 @@ type TimelineTrackProps = {
   onPasteTimeline: () => void;
   onClearTimeline: () => void;
   onDeleteSegment: (segmentId: string) => void;
+  onEatSegmentClick?: (segment: PlannerSegment) => void;
   footer?: ReactNode;
   showCurrentTimeMarker?: boolean;
 };
@@ -56,6 +61,7 @@ function TimelineTrack({
   subtitle,
   categories,
   segments,
+  meals = [],
   canPasteTimeline,
   draggingCategoryId,
   onMoveSegment,
@@ -65,6 +71,7 @@ function TimelineTrack({
   onPasteTimeline,
   onClearTimeline,
   onDeleteSegment,
+  onEatSegmentClick,
   footer,
   showCurrentTimeMarker = false
 }: TimelineTrackProps) {
@@ -106,6 +113,16 @@ function TimelineTrack({
     });
   }, [interaction, segments]);
 
+  const eatSegmentsWithMeals = useMemo(
+    () => resolveEatSegmentsWithAssignedMeals(segments, meals),
+    [segments, meals]
+  );
+
+  const hasUnassignedMeals = useMemo(
+    () => hasUnassignedEatSegment(segments, meals),
+    [segments, meals]
+  );
+
   /**
    * Starts a body-move interaction, recording the grab offset inside the block.
    */
@@ -119,7 +136,10 @@ function TimelineTrack({
       segmentId: segment.id,
       duration: segment.endSlot - segment.startSlot,
       grabOffsetSlots: grabSlot - segment.startSlot,
-      previewStartSlot: segment.startSlot
+      previewStartSlot: segment.startSlot,
+      pointerDownClientX: event.clientX,
+      pointerDownClientY: event.clientY,
+      pointerDownTime: Date.now()
     });
     event.currentTarget.setPointerCapture(event.pointerId);
   }
@@ -208,6 +228,23 @@ function TimelineTrack({
     }
 
     if (interaction.mode === "move") {
+      const segment = segments.find((candidate) => candidate.id === interaction.segmentId);
+      const isClick = isClickInteraction(
+        interaction.pointerDownClientX,
+        interaction.pointerDownClientY,
+        interaction.pointerDownTime,
+        event.clientX,
+        event.clientY,
+        Date.now()
+      );
+
+      if (segment?.categoryId === "eat" && onEatSegmentClick && isClick) {
+        onEatSegmentClick(segment);
+        setInteraction(null);
+        setIsTrashHot(false);
+        return;
+      }
+
       onMoveSegment(interaction.segmentId, interaction.previewStartSlot);
     } else {
       onResizeSegment(interaction.segmentId, interaction.previewStartSlot, interaction.previewEndSlot);
@@ -231,9 +268,15 @@ function TimelineTrack({
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-lg font-semibold">
-            <span>{title}</span>
+            {title ? <span>{title}</span> : null}
             {titleSuffix ? (
-              <span className="rounded-full border border-app-accent/50 bg-app-accent/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.16em] text-app-accent">
+              <span
+                className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.16em] ${
+                  hasUnassignedMeals
+                    ? "border-amber-300/50 bg-amber-300/15 text-amber-200"
+                    : "border-app-accent/50 bg-app-accent/15 text-app-accent"
+                }`}
+              >
                 {titleSuffix}
               </span>
             ) : null}
@@ -345,11 +388,19 @@ function TimelineTrack({
                     const segmentDurationLabel = formatSlotDurationLabel(segment.startSlot, segment.endSlot);
                     const isMinimumSizeSegment = segment.endSlot - segment.startSlot <= 1;
                     const resizeHandleWidthClass = isMinimumSizeSegment ? "w-2" : "w-3";
+                    const assignedMeals =
+                      segment.categoryId === "eat" ? resolveAssignedMeals(meals, segment.assignedMealIds) : [];
+                    const tooltipContent =
+                      assignedMeals.length > 0
+                        ? `${segmentLabel} • ${segmentTimeRangeLabel} • ${segmentDurationLabel} • Meals: ${assignedMeals
+                            .map((meal) => meal.name)
+                            .join(", ")}`
+                        : `${segmentLabel} • ${segmentTimeRangeLabel} • ${segmentDurationLabel}`;
 
                     return (
                       <Tooltip
                         key={segment.id}
-                        content={`${segmentLabel} • ${segmentTimeRangeLabel} • ${segmentDurationLabel}`}
+                        content={tooltipContent}
                         triggerClassName={`!absolute inset-y-0 flex min-w-0 select-none flex-col justify-between overflow-visible rounded-md border border-black/20 text-white shadow-sm ${isActive ? "ring-2 ring-app-accent/60" : ""}`}
                         triggerStyle={{
                           left,
@@ -429,6 +480,34 @@ function TimelineTrack({
           </div>
         </div>
       </div>
+
+      {eatSegmentsWithMeals.length > 0 ? (
+        <div className="space-y-2 border-t border-app-border pt-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-app-muted">Assigned Meals</p>
+          <ul className="flex items-center gap-2 overflow-x-auto">
+            {eatSegmentsWithMeals.map(({ segment, assignedMeals }) => (
+              <li
+                key={segment.id}
+                className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md border border-app-border bg-app-panel/60 px-3 py-2"
+              >
+                <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-app-muted">
+                  {formatSlotRangeLabelMeridiem(segment.startSlot, segment.endSlot)}
+                </span>
+                <div className="flex gap-1.5">
+                  {assignedMeals.map((meal) => (
+                    <span
+                      key={meal.id}
+                      className="rounded-full border border-emerald-300/40 bg-emerald-300/15 px-2 py-0.5 text-xs font-medium text-emerald-200"
+                    >
+                      {meal.name}
+                    </span>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {footer ? <div>{footer}</div> : null}
     </section>

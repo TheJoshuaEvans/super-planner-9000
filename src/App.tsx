@@ -1,10 +1,8 @@
 import CategoryPalette from "./components/CategoryPalette/CategoryPalette";
 import ConfirmDialog from "./components/ConfirmDialog/ConfirmDialog";
-import DashboardTimelineTrack from "./components/DashboardTimelineTrack/DashboardTimelineTrack";
 import GoogleCalendarReconnectButton from "./components/Settings/GoogleCalendarReconnectButton";
 import MealAssignmentPanel from "./components/MealAssignmentPanel/MealAssignmentPanel";
 import MealCreator from "./components/MealCreator/MealCreator";
-import MealTimelineTrack from "./components/MealTimelineTrack/MealTimelineTrack";
 import MonthlyWallCalendar from "./components/MonthlyWallCalendar/MonthlyWallCalendar";
 import PlannerHistoryControls from "./components/PlannerHistoryControls/PlannerHistoryControls";
 import PortraitWarningOverlay from "./components/PortraitWarningOverlay/PortraitWarningOverlay";
@@ -50,17 +48,6 @@ type SelectedEatSegment = {
 
 const PORTRAIT_WARNING_SESSION_KEY = "sp9000-portrait-warning-dismissed";
 
-/**
- * Day Planner dashboard timeline configuration.
- * Each entry describes one pinned timeline row shown at the top of the Day Planner.
- * Offset 0 = today; subsequent offsets extend into future days.
- */
-const DASHBOARD_TIMELINE_ROWS = [
-  { title: "Today", offset: 0, showCurrentTimeMarker: true },
-  { title: "Tomorrow", offset: 1, showCurrentTimeMarker: false },
-  { title: "Day after Tomorrow", offset: 2, showCurrentTimeMarker: false }
-] as const;
-
 /** The Dashboard tab, rendered as its own floating pill set apart from the other tabs. */
 const DASHBOARD_TAB = APP_TABS[0];
 
@@ -97,14 +84,12 @@ function App() {
     return isAppTab(storedTab) ? storedTab : APP_TABS[0].id;
   });
 
-  const dashboardDateKeys = DASHBOARD_TIMELINE_ROWS.map((row) => getRelativeCalendarDateKey(row.offset));
   const currentWeekDateKeys = Array.from({ length: 7 }, (_, offset) => getRelativeCalendarDateKey(offset));
 
   const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
   const [copiedTimelineSegments, setCopiedTimelineSegments] = useState<PlannerSegment[] | null>(null);
   const [copiedTimelineSourceDateKey, setCopiedTimelineSourceDateKey] = useState<PlannerDateKey | null>(null);
   const [selectedDateKey, setSelectedDateKey] = useState<PlannerDateKey | null>(null);
-  const [selectedMealDateKey, setSelectedMealDateKey] = useState<PlannerDateKey | null>(null);
   const [selectedEatSegment, setSelectedEatSegment] = useState<SelectedEatSegment | null>(null);
   const [pendingMealIds, setPendingMealIds] = useState<string[]>([]);
   const [isPortraitWarningDismissed, setIsPortraitWarningDismissed] = useState<boolean>(() => {
@@ -118,11 +103,8 @@ function App() {
   const canPasteTimeline = copiedTimelineSegments !== null;
   const selectedDateSegments = selectedDateKey ? (segmentsByDate[selectedDateKey] ?? []) : [];
   const selectedDateTitle = selectedDateKey ? formatCalendarDateLabel(selectedDateKey) : "";
-  const selectedMealDateSegments = selectedMealDateKey ? (segmentsByDate[selectedMealDateKey] ?? []) : [];
-  const selectedMealDateTitle = selectedMealDateKey ? formatCalendarDateLabel(selectedMealDateKey) : "";
   const activeTabDefinition = getAppTabDefinition(activeTab);
-  const isDayPlannerTab = activeTabDefinition.contentKind === "day-planner";
-  const isMealPlannerTab = activeTabDefinition.contentKind === "meal-planner";
+  const isDashboardTab = activeTabDefinition.contentKind === "dashboard";
   const selectedEatSegmentData = selectedEatSegment
     ? (segmentsByDate[selectedEatSegment.dateKey] ?? []).find((segment) => segment.id === selectedEatSegment.segmentId)
     : undefined;
@@ -135,7 +117,7 @@ function App() {
   }, [activeTab]);
 
   usePlannerUndoRedoHotkeys({
-    enabled: isDayPlannerTab,
+    enabled: isDashboardTab,
     canUndo: canUndoPlannerEdit,
     canRedo: canRedoPlannerEdit,
     onUndo: undoPlannerEdit,
@@ -419,8 +401,8 @@ function App() {
       <ToastViewport />
       <ConfirmDialog />
       <main
-        className={`min-h-screen bg-app-bg px-4 py-5 text-app-text lg:px-6 lg:py-6 ${selectedDateKey || selectedMealDateKey || selectedEatSegment ? "pb-[37rem] lg:pb-[39rem]" : "pb-32 lg:pb-36"} ${draggingCategoryId ? "cursor-grabbing" : ""}`}
-        onPointerUp={isDayPlannerTab ? () => setDraggingCategoryId(null) : undefined}
+        className={`min-h-screen bg-app-bg px-4 py-5 text-app-text lg:px-6 lg:py-6 ${selectedDateKey || selectedEatSegment ? "pb-[37rem] lg:pb-[39rem]" : "pb-32 lg:pb-36"} ${draggingCategoryId ? "cursor-grabbing" : ""}`}
+        onPointerUp={isDashboardTab ? () => setDraggingCategoryId(null) : undefined}
       >
         <section className="mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-[96rem] flex-col gap-5 rounded-lg bg-app-panel p-5 shadow-card lg:min-h-[calc(100vh-3rem)] lg:p-6">
           <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -474,35 +456,18 @@ function App() {
 
           {activeTabDefinition.contentKind === "dashboard" ? (
             <section className="flex flex-1 flex-col gap-5">
-              {currentWeekDateKeys.slice(0, 3).map((dateKey, dayOffset) => (
-                <DashboardTimelineTrack
-                  key={dateKey}
-                  dateKey={dateKey}
-                  weekdayLabel={formatDashboardWeekdayLabel(dateKey)}
-                  relativeLabel={getRelativeWeekDayLabel(dayOffset)}
-                  subtitle={formatDashboardDateSubtitle(dateKey)}
-                  categories={categories}
-                  segments={segmentsByDate[dateKey] ?? []}
-                  meals={meals}
-                  showCurrentTimeMarker={dayOffset === 0}
-                />
-              ))}
-
-              <ShoppingListPanel defaultEndDateOffsetDays={2} />
-            </section>
-          ) : activeTabDefinition.contentKind === "day-planner" ? (
-            <section className="flex flex-1 flex-col gap-5">
-              {DASHBOARD_TIMELINE_ROWS.map((row, index) => {
-                const dateKey = dashboardDateKeys[index];
+              {currentWeekDateKeys.map((dateKey, dayOffset) => {
+                const relativeLabel = getRelativeWeekDayLabel(dayOffset);
                 return (
                   <TimelineTrack
                     key={dateKey}
                     dateKey={dateKey}
-                    title={row.title}
+                    title={relativeLabel}
                     titleSuffix={formatDashboardWeekdayLabel(dateKey)}
                     subtitle={formatDashboardDateSubtitle(dateKey)}
                     categories={categories}
                     segments={segmentsByDate[dateKey] ?? []}
+                    meals={meals}
                     canPasteTimeline={canPasteTimeline}
                     onMoveSegment={(segmentId, nextStartSlot) => moveSegmentForDate(dateKey, segmentId, nextStartSlot)}
                     onResizeSegment={(segmentId, nextStartSlot, nextEndSlot) =>
@@ -516,7 +481,8 @@ function App() {
                       handleDropCategory(dateKey, categoryId, startSlot, endSlot)
                     }
                     onDeleteSegment={(segmentId) => deleteSegmentForDate(dateKey, segmentId)}
-                    showCurrentTimeMarker={row.showCurrentTimeMarker}
+                    onEatSegmentClick={(segment) => handleMealEatSegmentClick(dateKey, segment)}
+                    showCurrentTimeMarker={dayOffset === 0}
                   />
                 );
               })}
@@ -527,32 +493,6 @@ function App() {
                 onPasteDate={handlePasteTimeline}
                 onPasteWeekday={handlePasteAcrossDates}
                 canPasteTimeline={canPasteTimeline}
-                categories={categories}
-                segmentsByDate={segmentsByDate}
-              />
-            </section>
-          ) : activeTabDefinition.contentKind === "meal-planner" ? (
-            <section className="flex flex-1 flex-col gap-5">
-              {currentWeekDateKeys.map((dateKey, dayOffset) => {
-                const relativeLabel = getRelativeWeekDayLabel(dayOffset);
-                return (
-                  <MealTimelineTrack
-                    key={dateKey}
-                    title={relativeLabel}
-                    titleSuffix={formatDashboardWeekdayLabel(dateKey)}
-                    subtitle={formatDashboardDateSubtitle(dateKey)}
-                    categories={categories}
-                    segments={segmentsByDate[dateKey] ?? []}
-                    meals={meals}
-                    showCurrentTimeMarker={dayOffset === 0}
-                    onEatSegmentClick={(segment) => handleMealEatSegmentClick(dateKey, segment)}
-                  />
-                );
-              })}
-
-              <MonthlyWallCalendar
-                selectedDateKey={selectedMealDateKey}
-                onSelectDate={setSelectedMealDateKey}
                 categories={categories}
                 segmentsByDate={segmentsByDate}
               />
@@ -574,7 +514,7 @@ function App() {
           )}
         </section>
 
-        {isDayPlannerTab ? (
+        {isDashboardTab ? (
           <section className="fixed inset-x-0 bottom-0 z-50 px-4 pb-4 lg:px-6 lg:pb-5">
             <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-4 rounded-lg border border-app-border bg-app-surface/95 p-4 shadow-card backdrop-blur">
               <div className="flex items-center justify-end">
@@ -607,6 +547,7 @@ function App() {
                     title={selectedDateTitle}
                     categories={categories}
                     segments={selectedDateSegments}
+                    meals={meals}
                     canPasteTimeline={canPasteTimeline}
                     onMoveSegment={(segmentId, nextStartSlot) => moveSegmentForDate(selectedDateKey, segmentId, nextStartSlot)}
                     onResizeSegment={(segmentId, nextStartSlot, nextEndSlot) =>
@@ -620,44 +561,7 @@ function App() {
                       handleDropCategory(selectedDateKey, categoryId, startSlot, endSlot)
                     }
                     onDeleteSegment={(segmentId) => deleteSegmentForDate(selectedDateKey, segmentId)}
-                  />
-                </div>
-              ) : null}
-
-              <CategoryPalette
-                categories={categories}
-                draggingCategoryId={draggingCategoryId}
-                onCategoryDragStart={setDraggingCategoryId}
-              />
-            </div>
-          </section>
-        ) : null}
-
-        {isMealPlannerTab && (selectedMealDateKey || selectedEatSegment) ? (
-          <section className="fixed inset-x-0 bottom-0 z-50 px-4 pb-4 lg:px-6 lg:pb-5">
-            <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-4 rounded-lg border border-app-border bg-app-surface/95 p-4 shadow-card backdrop-blur">
-              {selectedMealDateKey ? (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-app-muted">
-                      Viewing {selectedMealDateTitle}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedMealDateKey(null)}
-                      className="rounded-md border border-app-border px-2 py-1 text-xs font-medium text-app-muted transition hover:border-app-text hover:text-app-text"
-                      aria-label="Close selected date meal view"
-                    >
-                      Close
-                    </button>
-                  </div>
-
-                  <MealTimelineTrack
-                    title={selectedMealDateTitle}
-                    categories={categories}
-                    segments={selectedMealDateSegments}
-                    meals={meals}
-                    onEatSegmentClick={(segment) => handleMealEatSegmentClick(selectedMealDateKey, segment)}
+                    onEatSegmentClick={(segment) => handleMealEatSegmentClick(selectedDateKey, segment)}
                   />
                 </div>
               ) : null}
@@ -672,6 +576,12 @@ function App() {
                   onClose={handleCloseMealAssignment}
                 />
               ) : null}
+
+              <CategoryPalette
+                categories={categories}
+                draggingCategoryId={draggingCategoryId}
+                onCategoryDragStart={setDraggingCategoryId}
+              />
             </div>
           </section>
         ) : null}

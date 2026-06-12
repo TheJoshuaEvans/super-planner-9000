@@ -15,24 +15,8 @@ export const APP_TABS = [
     label: "Dashboard",
     kicker: "Weekly Dashboard",
     description:
-      "A read-only overview of this week's Day Planner and Meal Planner timelines, combining the full category detail with assigned-meal callouts for each day.",
+      "Plan your week with draggable timeline blocks for the next 7 days, click an Eat block to assign meals, copy and paste patterns across dates, and keep an eye on your shopping list. Any date you select from the calendar opens in the docked editor below.",
     contentKind: "dashboard"
-  },
-  {
-    id: "day-planner",
-    label: "Day Planner",
-    kicker: "Daily Timeline Planner",
-    description:
-      "Plan your day with draggable timeline blocks, copy and paste patterns across dates, and preview how each calendar day is filling up at a glance. Today and tomorrow stay pinned up top, while any date you select from the calendar opens in the docked editor below.",
-    contentKind: "day-planner"
-  },
-  {
-    id: "meal-planner",
-    label: "Meal Planner",
-    kicker: "Meal Planner",
-    description:
-      "Review your day through a meal-planning lens, with food blocks emphasized and everything else subdued.",
-    contentKind: "meal-planner"
   },
   {
     id: "meal-creator",

@@ -11,6 +11,9 @@ export type MoveInteraction = {
   duration: number;
   grabOffsetSlots: number;
   previewStartSlot: number;
+  pointerDownClientX: number;
+  pointerDownClientY: number;
+  pointerDownTime: number;
 };
 
 export type ResizeInteraction = {
@@ -25,6 +28,12 @@ export type ResizeInteraction = {
 export type InteractionState = MoveInteraction | ResizeInteraction;
 
 const MIN_RESIZE_SLOTS = 1;
+
+/** Maximum pointer travel (in pixels) for a press-release to still count as a click rather than a drag. */
+export const CLICK_MAX_DISTANCE_PX = 6;
+
+/** Maximum elapsed time (in milliseconds) for a press-release to still count as a click rather than a drag. */
+export const CLICK_MAX_DURATION_MS = 350;
 
 /**
  * Resolves the clamped start slot for a move interaction from a pointer position.
@@ -96,4 +105,29 @@ export function resolveDropPreviewSlot(clientX: number, trackLeft: number, track
  */
 export function isPointerInRect(clientX: number, clientY: number, rect: Pick<DOMRect, "left" | "right" | "top" | "bottom">): boolean {
   return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+}
+
+/**
+ * Determines whether a pointer-down/pointer-up pair represents a click (as opposed to a drag),
+ * based on how far and how long the pointer traveled between the two events.
+ *
+ * @param pointerDownClientX - Pointer x-coordinate at pointer-down, in viewport pixels.
+ * @param pointerDownClientY - Pointer y-coordinate at pointer-down, in viewport pixels.
+ * @param pointerDownTime - Timestamp (ms) at pointer-down.
+ * @param clientX - Pointer x-coordinate at pointer-up, in viewport pixels.
+ * @param clientY - Pointer y-coordinate at pointer-up, in viewport pixels.
+ * @param now - Timestamp (ms) at pointer-up.
+ * @returns Whether the interaction stayed within both the click distance and duration thresholds.
+ */
+export function isClickInteraction(
+  pointerDownClientX: number,
+  pointerDownClientY: number,
+  pointerDownTime: number,
+  clientX: number,
+  clientY: number,
+  now: number
+): boolean {
+  const distance = Math.hypot(clientX - pointerDownClientX, clientY - pointerDownClientY);
+  const duration = now - pointerDownTime;
+  return distance <= CLICK_MAX_DISTANCE_PX && duration <= CLICK_MAX_DURATION_MS;
 }

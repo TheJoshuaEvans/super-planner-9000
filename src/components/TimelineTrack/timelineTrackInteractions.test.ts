@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isClickInteraction,
   isPointerInRect,
   resolveDropPreviewSlot,
   resolveMoveStart,
@@ -15,7 +16,10 @@ describe("timelineTrackInteractions", () => {
       segmentId: "seg-1",
       duration: 8,
       grabOffsetSlots: 2,
-      previewStartSlot: 0
+      previewStartSlot: 0,
+      pointerDownClientX: 0,
+      pointerDownClientY: 0,
+      pointerDownTime: 0
     };
 
     expect(resolveMoveStart(50, interaction, 0, 100)).toBe(46);
@@ -59,5 +63,17 @@ describe("timelineTrackInteractions", () => {
     expect(isPointerInRect(20, 60, rect)).toBe(true);
     expect(isPointerInRect(5, 60, rect)).toBe(false);
     expect(isPointerInRect(20, 100, rect)).toBe(false);
+  });
+
+  it("detects a click when pointer travel and duration stay within thresholds", () => {
+    expect(isClickInteraction(100, 100, 1000, 102, 101, 1100)).toBe(true);
+  });
+
+  it("rejects a click when pointer travel exceeds the distance threshold", () => {
+    expect(isClickInteraction(100, 100, 1000, 120, 100, 1100)).toBe(false);
+  });
+
+  it("rejects a click when the press is held longer than the duration threshold", () => {
+    expect(isClickInteraction(100, 100, 1000, 101, 100, 1400)).toBe(false);
   });
 });
