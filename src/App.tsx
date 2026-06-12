@@ -533,18 +533,18 @@ function App() {
             </section>
           ) : activeTabDefinition.contentKind === "meal-planner" ? (
             <section className="flex flex-1 flex-col gap-5">
-              {DASHBOARD_TIMELINE_ROWS.map((row, index) => {
-                const dateKey = dashboardDateKeys[index];
+              {currentWeekDateKeys.map((dateKey, dayOffset) => {
+                const relativeLabel = getRelativeWeekDayLabel(dayOffset);
                 return (
                   <MealTimelineTrack
                     key={dateKey}
-                    title={row.title}
+                    title={relativeLabel}
                     titleSuffix={formatDashboardWeekdayLabel(dateKey)}
                     subtitle={formatDashboardDateSubtitle(dateKey)}
                     categories={categories}
                     segments={segmentsByDate[dateKey] ?? []}
                     meals={meals}
-                    showCurrentTimeMarker={row.showCurrentTimeMarker}
+                    showCurrentTimeMarker={dayOffset === 0}
                     onEatSegmentClick={(segment) => handleMealEatSegmentClick(dateKey, segment)}
                   />
                 );
@@ -557,7 +557,7 @@ function App() {
                 segmentsByDate={segmentsByDate}
               />
 
-              <ShoppingListPanel />
+              <ShoppingListPanel defaultEndDateOffsetDays={6} />
             </section>
           ) : activeTabDefinition.contentKind === "meal-creator" ? (
             <section className="flex flex-1 flex-col gap-5">

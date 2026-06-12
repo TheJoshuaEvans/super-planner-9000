@@ -22,7 +22,7 @@ function GoogleCalendarPanel() {
       <div className="space-y-1">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-app-muted">Google Calendar</h3>
         <p className="text-sm text-app-text">
-          Connect your Google account to test read-only access to Google Calendar. Full sync is coming soon.
+          Connect your Google account to give read-only access to Google Calendar.
         </p>
       </div>
 

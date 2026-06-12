@@ -106,6 +106,8 @@ export function buildShoppingListPrintHtml(items: ShoppingListItem[], dateRangeL
         list-style: none;
         margin: 0;
         padding: 0;
+        column-count: 2;
+        column-gap: 3rem;
       }
       .item {
         display: flex;
@@ -113,6 +115,7 @@ export function buildShoppingListPrintHtml(items: ShoppingListItem[], dateRangeL
         gap: 0.75rem;
         font-size: 1.6rem;
         line-height: 2.4rem;
+        break-inside: avoid;
       }
       .box {
         flex: 0 0 auto;

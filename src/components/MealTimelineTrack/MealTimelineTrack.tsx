@@ -15,7 +15,7 @@ import TimelineQuarterHourGrid from "../shared/TimelineQuarterHourGrid";
 import Tooltip from "../Tooltip/Tooltip";
 
 type MealTimelineTrackProps = {
-  title: string;
+  title?: string;
   titleSuffix?: string;
   subtitle?: string;
   categories: PlannerCategory[];
@@ -77,7 +77,7 @@ function MealTimelineTrack({
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-lg font-semibold">
-            <span>{title}</span>
+            {title ? <span>{title}</span> : null}
             {titleSuffix ? (
               <span
                 className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.16em] ${

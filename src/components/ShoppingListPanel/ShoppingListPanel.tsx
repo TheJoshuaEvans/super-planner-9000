@@ -105,7 +105,7 @@ function ShoppingListPanel({ defaultEndDateOffsetDays = 0 }: ShoppingListPanelPr
           No meals are assigned to this date range yet.
         </p>
       ) : (
-        <ul className="grid grid-cols-2 gap-1.5">
+        <ul className="grid grid-cols-4 gap-1.5">
           {shoppingList.map((item) => (
             <li
               key={`${item.componentId}::${item.unit}`}
