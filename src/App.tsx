@@ -1,15 +1,18 @@
 import CategoryPalette from "./components/CategoryPalette/CategoryPalette";
 import ConfirmDialog from "./components/ConfirmDialog/ConfirmDialog";
 import DashboardTimelineTrack from "./components/DashboardTimelineTrack/DashboardTimelineTrack";
+import GoogleCalendarReconnectButton from "./components/Settings/GoogleCalendarReconnectButton";
 import MealAssignmentPanel from "./components/MealAssignmentPanel/MealAssignmentPanel";
 import MealCreator from "./components/MealCreator/MealCreator";
 import MealTimelineTrack from "./components/MealTimelineTrack/MealTimelineTrack";
 import MonthlyWallCalendar from "./components/MonthlyWallCalendar/MonthlyWallCalendar";
 import PlannerHistoryControls from "./components/PlannerHistoryControls/PlannerHistoryControls";
 import PortraitWarningOverlay from "./components/PortraitWarningOverlay/PortraitWarningOverlay";
+import Settings from "./components/Settings/Settings";
 import ShoppingListPanel from "./components/ShoppingListPanel/ShoppingListPanel";
 import ToastViewport from "./components/ToastViewport/ToastViewport";
 import TimelineTrack from "./components/TimelineTrack/TimelineTrack";
+import { useGoogleCalendarTokenExpiry } from "./hooks/useGoogleCalendarTokenExpiry";
 import { usePlannerUndoRedoHotkeys } from "./hooks/usePlannerUndoRedoHotkeys";
 import {
   ACTIVE_TAB_LOCAL_STORAGE_KEY,
@@ -138,6 +141,8 @@ function App() {
     onUndo: undoPlannerEdit,
     onRedo: redoPlannerEdit
   });
+
+  useGoogleCalendarTokenExpiry();
 
   /**
    * Exports the current planner state to a JSON file.
@@ -429,6 +434,8 @@ function App() {
 
             <div className="flex flex-col items-start gap-3 lg:items-end">
               <div className="flex items-center gap-2" role="group" aria-label="App tabs">
+                <GoogleCalendarReconnectButton />
+
                 <div className="inline-flex rounded-lg border border-app-border bg-app-surface/90 p-1 shadow-sm">
                   {renderTabButton(DASHBOARD_TAB)}
                 </div>
@@ -470,6 +477,7 @@ function App() {
               {currentWeekDateKeys.slice(0, 3).map((dateKey, dayOffset) => (
                 <DashboardTimelineTrack
                   key={dateKey}
+                  dateKey={dateKey}
                   weekdayLabel={formatDashboardWeekdayLabel(dateKey)}
                   relativeLabel={getRelativeWeekDayLabel(dayOffset)}
                   subtitle={formatDashboardDateSubtitle(dateKey)}
@@ -480,7 +488,7 @@ function App() {
                 />
               ))}
 
-              <ShoppingListPanel />
+              <ShoppingListPanel defaultEndDateOffsetDays={2} />
             </section>
           ) : activeTabDefinition.contentKind === "day-planner" ? (
             <section className="flex flex-1 flex-col gap-5">
@@ -489,6 +497,7 @@ function App() {
                 return (
                   <TimelineTrack
                     key={dateKey}
+                    dateKey={dateKey}
                     title={row.title}
                     titleSuffix={formatDashboardWeekdayLabel(dateKey)}
                     subtitle={formatDashboardDateSubtitle(dateKey)}
@@ -554,6 +563,8 @@ function App() {
             <section className="flex flex-1 flex-col gap-5">
               <MealCreator />
             </section>
+          ) : activeTabDefinition.contentKind === "settings" ? (
+            <Settings />
           ) : (
             <section className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-app-border bg-app-surface/70 px-6 py-16 text-center">
               <div className="max-w-md">
@@ -592,6 +603,7 @@ function App() {
                   </div>
 
                   <TimelineTrack
+                    dateKey={selectedDateKey}
                     title={selectedDateTitle}
                     categories={categories}
                     segments={selectedDateSegments}

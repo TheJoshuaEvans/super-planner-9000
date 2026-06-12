@@ -5,7 +5,7 @@ import { quarterHourMarks } from "../../lib/timeline";
  */
 function TimelineQuarterHourGrid() {
   return (
-    <div className="absolute inset-x-0 inset-y-3 grid grid-cols-96 overflow-hidden rounded-lg">
+    <div className="absolute inset-x-0 top-3 bottom-1.5 grid grid-cols-96 overflow-hidden rounded-lg">
       {quarterHourMarks.map((slot) => {
         const isHourMark = slot % 4 === 0;
 

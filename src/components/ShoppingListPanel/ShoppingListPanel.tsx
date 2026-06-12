@@ -11,18 +11,27 @@ const dateInputClassName =
 const printButtonClassName =
   "rounded-md bg-app-accent px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-app-accentStrong disabled:cursor-not-allowed disabled:opacity-40";
 
+type ShoppingListPanelProps = {
+  /** How many days past today the end-date picker defaults to (0 = today only). */
+  defaultEndDateOffsetDays?: number;
+};
+
 /**
- * Card on the Meal Planner tab that lets the user pick an upcoming date range and generates
- * an aggregated shopping list for the meals assigned to "eat" segments within that range.
+ * Card that lets the user pick an upcoming date range and generates an aggregated shopping
+ * list for the meals assigned to "eat" segments within that range.
  */
-function ShoppingListPanel() {
+function ShoppingListPanel({ defaultEndDateOffsetDays = 0 }: ShoppingListPanelProps) {
   const segmentsByDate = usePlannerStore((state) => state.segmentsByDate);
   const meals = useMealStore((state) => state.meals);
   const components = useMealStore((state) => state.components);
 
   const todayKey = useMemo(() => getRelativeCalendarDateKey(0), []);
+  const defaultEndDateKey = useMemo(
+    () => getRelativeCalendarDateKey(defaultEndDateOffsetDays),
+    [defaultEndDateOffsetDays]
+  );
   const [startDateKey, setStartDateKey] = useState(todayKey);
-  const [endDateKey, setEndDateKey] = useState(todayKey);
+  const [endDateKey, setEndDateKey] = useState(defaultEndDateKey);
 
   /** Updates the range start date, pulling the end date forward if it would precede it. */
   function handleStartDateChange(event: ChangeEvent<HTMLInputElement>): void {

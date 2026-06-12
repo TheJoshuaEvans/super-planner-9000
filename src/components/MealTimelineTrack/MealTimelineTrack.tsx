@@ -200,16 +200,16 @@ function MealTimelineTrack({
       {eatSegmentsWithMeals.length > 0 ? (
         <div className="space-y-2 border-t border-app-border pt-3">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-app-muted">Assigned Meals</p>
-          <ul className="space-y-2">
+          <ul className="flex items-center gap-2 overflow-x-auto">
             {eatSegmentsWithMeals.map(({ segment, assignedMeals }) => (
               <li
                 key={segment.id}
-                className="flex flex-wrap items-center gap-2 rounded-md border border-app-border bg-app-panel/60 px-3 py-2"
+                className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md border border-app-border bg-app-panel/60 px-3 py-2"
               >
                 <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-app-muted">
                   {formatSlotRangeLabelMeridiem(segment.startSlot, segment.endSlot)}
                 </span>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex gap-1.5">
                   {assignedMeals.map((meal) => (
                     <span
                       key={meal.id}

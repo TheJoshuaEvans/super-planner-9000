@@ -10,11 +10,13 @@ import { resolveCurrentTimePercent } from "../../lib/timelineNow";
 import { useTimelineMarkerClock } from "../../hooks/useTimelineMarkerClock";
 import type { Meal } from "../../store/mealStore";
 import type { PlannerCategory, PlannerSegment } from "../../store/plannerStore";
+import MiniTimeline from "../shared/MiniTimeline";
 import TimelineHourRuler from "../shared/TimelineHourRuler";
 import TimelineQuarterHourGrid from "../shared/TimelineQuarterHourGrid";
 import Tooltip from "../Tooltip/Tooltip";
 
 type DashboardTimelineTrackProps = {
+  dateKey: string;
   weekdayLabel: string;
   relativeLabel?: string;
   subtitle?: string;
@@ -29,6 +31,7 @@ type DashboardTimelineTrackProps = {
  * with the Meal Planner's assigned-meal callouts for a single day.
  */
 function DashboardTimelineTrack({
+  dateKey,
   weekdayLabel,
   relativeLabel,
   subtitle,
@@ -87,10 +90,11 @@ function DashboardTimelineTrack({
         <div className="min-w-[72rem] space-y-2">
           <TimelineHourRuler />
 
-          <div className="relative h-[6.5rem] rounded-lg border border-app-border bg-app-panel">
-            <TimelineQuarterHourGrid />
+          <div className="relative rounded-lg border border-app-border bg-app-panel">
+            <div className="relative h-[6.5rem]">
+              <TimelineQuarterHourGrid />
 
-            <div className="absolute inset-x-0 inset-y-3 px-3">
+              <div className="absolute inset-x-0 top-3 bottom-1.5 px-3">
               <div ref={trackRef} className="relative h-full">
                 {showCurrentTimeMarker ? (
                   <div
@@ -164,6 +168,9 @@ function DashboardTimelineTrack({
                 )}
               </div>
             </div>
+            </div>
+
+            <MiniTimeline dateKey={dateKey} />
           </div>
         </div>
       </div>
@@ -171,16 +178,16 @@ function DashboardTimelineTrack({
       {eatSegmentsWithMeals.length > 0 ? (
         <div className="space-y-2 border-t border-app-border pt-3">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-app-muted">Assigned Meals</p>
-          <ul className="space-y-2">
+          <ul className="flex items-center gap-2 overflow-x-auto">
             {eatSegmentsWithMeals.map(({ segment, assignedMeals }) => (
               <li
                 key={segment.id}
-                className="flex flex-wrap items-center gap-2 rounded-md border border-app-border bg-app-panel/60 px-3 py-2"
+                className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md border border-app-border bg-app-panel/60 px-3 py-2"
               >
                 <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-app-muted">
                   {formatSlotRangeLabelMeridiem(segment.startSlot, segment.endSlot)}
                 </span>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex gap-1.5">
                   {assignedMeals.map((meal) => (
                     <span
                       key={meal.id}

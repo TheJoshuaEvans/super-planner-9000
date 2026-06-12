@@ -21,11 +21,13 @@ import {
   type ResizeInteraction
 } from "./timelineTrackInteractions";
 import { getTimelineControlButtonClassName } from "../shared/timelineControlButton";
+import MiniTimeline from "../shared/MiniTimeline";
 import TimelineHourRuler from "../shared/TimelineHourRuler";
 import TimelineQuarterHourGrid from "../shared/TimelineQuarterHourGrid";
 import Tooltip from "../Tooltip/Tooltip";
 
 type TimelineTrackProps = {
+  dateKey: string;
   title: string;
   titleSuffix?: string;
   subtitle?: string;
@@ -48,6 +50,7 @@ type TimelineTrackProps = {
  * Renders the day timeline grid and any scheduled segments placed on it.
  */
 function TimelineTrack({
+  dateKey,
   title,
   titleSuffix,
   subtitle,
@@ -292,10 +295,11 @@ function TimelineTrack({
         <div className="min-w-[72rem] space-y-2">
           <TimelineHourRuler />
 
-          <div className="relative h-[6.5rem] rounded-lg border border-app-border bg-app-panel">
-            <TimelineQuarterHourGrid />
+          <div className="relative rounded-lg border border-app-border bg-app-panel">
+            <div className="relative h-[6.5rem]">
+              <TimelineQuarterHourGrid />
 
-            <div className="absolute inset-x-0 inset-y-3 px-3">
+              <div className="absolute inset-x-0 top-3 bottom-1.5 px-3">
               <div
                 ref={trackRef}
                 className={`relative h-full ${draggingCategoryId ? "cursor-grabbing" : ""}`}
@@ -419,6 +423,9 @@ function TimelineTrack({
                 )}
               </div>
             </div>
+            </div>
+
+            <MiniTimeline dateKey={dateKey} />
           </div>
         </div>
       </div>
