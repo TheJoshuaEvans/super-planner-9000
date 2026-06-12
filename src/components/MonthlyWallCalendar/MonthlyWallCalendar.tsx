@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { buildCalendarMonthView, getMonthStart, shiftMonth } from "../../lib/calendar";
+import { buildCalendarMonthView, getMonthStart, parseCalendarDateKey, shiftMonth } from "../../lib/calendar";
 import {
   buildCalendarStatusLabel,
   buildDateKeysByWeekday,
@@ -16,6 +16,8 @@ type MonthlyWallCalendarProps = {
   canPasteTimeline?: boolean;
   categories?: PlannerCategory[];
   segmentsByDate?: PlannerSegmentsByDate;
+  /** Today's date key (YYYY-MM-DD), used to keep the "today" highlight in sync across midnight. */
+  todayDateKey?: string;
 };
 
 /**
@@ -28,13 +30,14 @@ function MonthlyWallCalendar({
   selectedDateKey = null,
   canPasteTimeline = false,
   categories = [],
-  segmentsByDate = {}
+  segmentsByDate = {},
+  todayDateKey
 }: MonthlyWallCalendarProps) {
   const [visibleMonth, setVisibleMonth] = useState<Date>(() => getMonthStart(new Date()));
 
   const monthView = useMemo(
-    () => buildCalendarMonthView(visibleMonth),
-    [visibleMonth]
+    () => buildCalendarMonthView(visibleMonth, todayDateKey ? (parseCalendarDateKey(todayDateKey) ?? undefined) : undefined),
+    [visibleMonth, todayDateKey]
   );
 
   /**

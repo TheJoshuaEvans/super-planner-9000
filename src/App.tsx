@@ -12,6 +12,7 @@ import TimelineTrack from "./components/TimelineTrack/TimelineTrack";
 import type { CrossDragPreview } from "./components/TimelineTrack/timelineTrackInteractions";
 import { useGoogleCalendarTokenExpiry } from "./hooks/useGoogleCalendarTokenExpiry";
 import { usePlannerUndoRedoHotkeys } from "./hooks/usePlannerUndoRedoHotkeys";
+import { useTodayDateKey } from "./hooks/useTodayDateKey";
 import {
   ACTIVE_TAB_LOCAL_STORAGE_KEY,
   APP_TABS,
@@ -19,7 +20,7 @@ import {
   isAppTab
 } from "./lib/appTabs";
 import type { AppTab, AppTabDefinition } from "./lib/appTabs";
-import { formatCalendarDateLabel, getRelativeCalendarDateKey } from "./lib/calendar";
+import { formatCalendarDateLabel, getRelativeCalendarDateKey, parseCalendarDateKey } from "./lib/calendar";
 import { toggleMealSelection } from "./lib/mealAssignment";
 import {
   buildPlannerExportFilename,
@@ -84,7 +85,10 @@ function App() {
     return isAppTab(storedTab) ? storedTab : APP_TABS[0].id;
   });
 
-  const currentWeekDateKeys = Array.from({ length: 7 }, (_, offset) => getRelativeCalendarDateKey(offset));
+  const todayDateKey = useTodayDateKey();
+  const currentWeekDateKeys = Array.from({ length: 7 }, (_, offset) =>
+    getRelativeCalendarDateKey(offset, parseCalendarDateKey(todayDateKey) ?? new Date())
+  );
 
   const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
   const [copiedTimelineSegments, setCopiedTimelineSegments] = useState<PlannerSegment[] | null>(null);
@@ -497,6 +501,7 @@ function App() {
                 canPasteTimeline={canPasteTimeline}
                 categories={categories}
                 segmentsByDate={segmentsByDate}
+                todayDateKey={todayDateKey}
               />
 
               <ShoppingListPanel defaultEndDateOffsetDays={6} />

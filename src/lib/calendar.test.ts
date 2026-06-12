@@ -3,6 +3,7 @@ import {
   buildCalendarMonthView,
   formatCalendarDateLabel,
   formatCalendarDateIdentity,
+  getMillisecondsUntilNextMidnight,
   getRelativeCalendarDateKey,
   getMonthStart,
   parseCalendarDateKey,
@@ -55,5 +56,11 @@ describe("calendar", () => {
     expect(getRelativeCalendarDateKey(0, base)).toBe("2025-12-31");
     expect(getRelativeCalendarDateKey(1, base)).toBe("2026-01-01");
     expect(getRelativeCalendarDateKey(-1, base)).toBe("2025-12-30");
+  });
+
+  it("computes milliseconds until the next local midnight", () => {
+    expect(getMillisecondsUntilNextMidnight(new Date(2026, 5, 9, 23, 59, 0))).toBe(60_000);
+    expect(getMillisecondsUntilNextMidnight(new Date(2026, 5, 9, 0, 0, 0))).toBe(24 * 60 * 60 * 1000);
+    expect(getMillisecondsUntilNextMidnight(new Date(2025, 11, 31, 12, 0, 0))).toBe(12 * 60 * 60 * 1000);
   });
 });

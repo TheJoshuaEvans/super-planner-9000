@@ -97,6 +97,17 @@ export function getRelativeCalendarDateKey(offsetDays: number, baseDate: Date = 
 }
 
 /**
+ * Computes how many milliseconds remain until the next local midnight after the given time.
+ *
+ * @param now - Current local Date.
+ * @returns Milliseconds until the start of the following local day.
+ */
+export function getMillisecondsUntilNextMidnight(now: Date): number {
+  const nextMidnight = toLocalDate(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  return nextMidnight.getTime() - now.getTime();
+}
+
+/**
  * Returns the first day of the provided month in local time.
  *
  * @param date - Any local Date within the target month.

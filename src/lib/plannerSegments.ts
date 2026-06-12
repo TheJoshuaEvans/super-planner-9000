@@ -69,8 +69,70 @@ export function getTimelineCompleteness(
   return coveredSlots >= totalDaySlots ? "full" : "partial";
 }
 
+/** Segment fields that describe placement on the timeline rather than the block's "type". */
+const SEGMENT_PLACEMENT_KEYS = new Set<keyof PlannerSegment>(["id", "startSlot", "endSlot"]);
+
 /**
- * Inserts a segment into the timeline by trimming or splitting any overlapping segments.
+ * Builds a stable signature of everything that makes a segment a particular "kind" of
+ * block — its category plus any additional metadata (e.g. assigned meals) — ignoring
+ * placement fields (id/startSlot/endSlot) and treating absent/empty optional fields as
+ * equivalent. Arrays are order-normalized. Two segments with the same signature represent
+ * the same kind of block and are candidates for merging when adjacent.
+ *
+ * Generalized so that future per-segment metadata fields are included automatically.
+ */
+export function getSegmentMetadataSignature(segment: PlannerSegment): string {
+  const entries = Object.entries(segment).filter(([key, value]) => {
+    if (SEGMENT_PLACEMENT_KEYS.has(key as keyof PlannerSegment)) {
+      return false;
+    }
+
+    if (value === undefined || value === null) {
+      return false;
+    }
+
+    return !(Array.isArray(value) && value.length === 0);
+  });
+
+  const normalized = entries
+    .map(([key, value]) => [key, Array.isArray(value) ? [...value].sort() : value] as const)
+    .sort(([left], [right]) => left.localeCompare(right));
+
+  return JSON.stringify(normalized);
+}
+
+/**
+ * Merges segments that sit directly adjacent to one another (one's end slot equals the
+ * next's start slot) and share an identical metadata signature into a single combined
+ * segment, e.g. two touching "Eat" blocks with the same assigned meals become one block.
+ * The earlier segment's id is kept. Input does not need to be pre-sorted.
+ */
+export function mergeAdjacentSegments(segments: PlannerSegment[]): PlannerSegment[] {
+  const sorted = [...segments].sort((left, right) => left.startSlot - right.startSlot);
+  const merged: PlannerSegment[] = [];
+
+  for (const segment of sorted) {
+    const previous = merged[merged.length - 1];
+
+    if (
+      previous &&
+      previous.endSlot === segment.startSlot &&
+      getSegmentMetadataSignature(previous) === getSegmentMetadataSignature(segment)
+    ) {
+      merged[merged.length - 1] = cloneSegment(previous, { endSlot: segment.endSlot });
+      continue;
+    }
+
+    merged.push(segment);
+  }
+
+  return merged;
+}
+
+/**
+ * Inserts a segment into the timeline by trimming or splitting any overlapping segments,
+ * then merges the result with any now-adjacent segments of the same kind (see
+ * `mergeAdjacentSegments`).
  */
 export function applySegmentOverwrite(
   existingSegments: PlannerSegment[],
@@ -101,9 +163,9 @@ export function applySegmentOverwrite(
     return trimmedSegments;
   });
 
-  return [...normalizedSegments, nextSegment]
-    .filter((segment) => segment.endSlot > segment.startSlot)
-    .sort((left, right) => left.startSlot - right.startSlot);
+  return mergeAdjacentSegments(
+    [...normalizedSegments, nextSegment].filter((segment) => segment.endSlot > segment.startSlot)
+  );
 }
 
 /**

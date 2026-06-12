@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   applySegmentOverwrite,
   createSegment,
+  getSegmentMetadataSignature,
   getTimelineCompleteness,
+  mergeAdjacentSegments,
   moveSegment,
   moveSegmentAcrossLists,
   pasteSegmentsWithOverwrite,
@@ -247,5 +249,136 @@ describe("plannerSegments", () => {
         { id: "b", categoryId: "play", startSlot: 50, endSlot: 96 }
       ], 96)
     ).toBe("full");
+  });
+
+  describe("getSegmentMetadataSignature", () => {
+    it("matches segments with the same category and no extra metadata", () => {
+      const a = { id: "a", categoryId: "work", startSlot: 0, endSlot: 4 };
+      const b = { id: "b", categoryId: "work", startSlot: 8, endSlot: 12 };
+
+      expect(getSegmentMetadataSignature(a)).toBe(getSegmentMetadataSignature(b));
+    });
+
+    it("differs for different categories", () => {
+      const a = { id: "a", categoryId: "work", startSlot: 0, endSlot: 4 };
+      const b = { id: "b", categoryId: "play", startSlot: 8, endSlot: 12 };
+
+      expect(getSegmentMetadataSignature(a)).not.toBe(getSegmentMetadataSignature(b));
+    });
+
+    it("treats absent and empty assignedMealIds as equivalent", () => {
+      const a = { id: "a", categoryId: "eat", startSlot: 0, endSlot: 4 };
+      const b = { id: "b", categoryId: "eat", startSlot: 8, endSlot: 12, assignedMealIds: [] };
+
+      expect(getSegmentMetadataSignature(a)).toBe(getSegmentMetadataSignature(b));
+    });
+
+    it("ignores assigned meal order", () => {
+      const a = { id: "a", categoryId: "eat", startSlot: 0, endSlot: 4, assignedMealIds: ["meal-1", "meal-2"] };
+      const b = { id: "b", categoryId: "eat", startSlot: 8, endSlot: 12, assignedMealIds: ["meal-2", "meal-1"] };
+
+      expect(getSegmentMetadataSignature(a)).toBe(getSegmentMetadataSignature(b));
+    });
+
+    it("differs when assigned meals differ", () => {
+      const a = { id: "a", categoryId: "eat", startSlot: 0, endSlot: 4, assignedMealIds: ["meal-1"] };
+      const b = { id: "b", categoryId: "eat", startSlot: 8, endSlot: 12, assignedMealIds: ["meal-2"] };
+
+      expect(getSegmentMetadataSignature(a)).not.toBe(getSegmentMetadataSignature(b));
+    });
+  });
+
+  describe("mergeAdjacentSegments", () => {
+    it("merges directly adjacent segments of the same kind into one", () => {
+      const merged = mergeAdjacentSegments([
+        { id: "a", categoryId: "work", startSlot: 0, endSlot: 4 },
+        { id: "b", categoryId: "work", startSlot: 4, endSlot: 8 }
+      ]);
+
+      expect(merged).toEqual([{ id: "a", categoryId: "work", startSlot: 0, endSlot: 8 }]);
+    });
+
+    it("does not merge adjacent segments of different categories", () => {
+      const merged = mergeAdjacentSegments([
+        { id: "a", categoryId: "work", startSlot: 0, endSlot: 4 },
+        { id: "b", categoryId: "sleep", startSlot: 4, endSlot: 8 }
+      ]);
+
+      expect(merged).toHaveLength(2);
+    });
+
+    it("does not merge same-category segments with different assigned meals", () => {
+      const merged = mergeAdjacentSegments([
+        { id: "a", categoryId: "eat", startSlot: 0, endSlot: 4, assignedMealIds: ["meal-1"] },
+        { id: "b", categoryId: "eat", startSlot: 4, endSlot: 8, assignedMealIds: ["meal-2"] }
+      ]);
+
+      expect(merged).toHaveLength(2);
+    });
+
+    it("merges same-category eat segments with matching assigned meals", () => {
+      const merged = mergeAdjacentSegments([
+        { id: "a", categoryId: "eat", startSlot: 0, endSlot: 4, assignedMealIds: ["meal-1"] },
+        { id: "b", categoryId: "eat", startSlot: 4, endSlot: 8, assignedMealIds: ["meal-1"] }
+      ]);
+
+      expect(merged).toEqual([{ id: "a", categoryId: "eat", startSlot: 0, endSlot: 8, assignedMealIds: ["meal-1"] }]);
+    });
+
+    it("does not merge segments separated by a gap", () => {
+      const merged = mergeAdjacentSegments([
+        { id: "a", categoryId: "work", startSlot: 0, endSlot: 4 },
+        { id: "b", categoryId: "work", startSlot: 6, endSlot: 10 }
+      ]);
+
+      expect(merged).toHaveLength(2);
+    });
+  });
+
+  it("merges a dropped segment into an adjacent segment of the same kind", () => {
+    const updated = applySegmentOverwrite(
+      [{ id: "a", categoryId: "work", startSlot: 0, endSlot: 4 }],
+      { id: "b", categoryId: "work", startSlot: 4, endSlot: 8 }
+    );
+
+    expect(updated).toEqual([{ id: "a", categoryId: "work", startSlot: 0, endSlot: 8 }]);
+  });
+
+  it("does not merge a dropped eat segment with mismatched assigned meals", () => {
+    const updated = applySegmentOverwrite(
+      [{ id: "a", categoryId: "eat", startSlot: 0, endSlot: 4, assignedMealIds: ["meal-1"] }],
+      { id: "b", categoryId: "eat", startSlot: 4, endSlot: 8, assignedMealIds: ["meal-2"] }
+    );
+
+    expect(updated).toHaveLength(2);
+  });
+
+  it("merges a moved segment into an adjacent segment of the same kind", () => {
+    const updated = moveSegment(
+      [
+        { id: "a", categoryId: "work", startSlot: 0, endSlot: 4 },
+        { id: "b", categoryId: "work", startSlot: 10, endSlot: 14 }
+      ],
+      "b",
+      4,
+      96
+    );
+
+    expect(updated).toEqual([{ id: "a", categoryId: "work", startSlot: 0, endSlot: 8 }]);
+  });
+
+  it("merges a resized segment into an adjacent segment of the same kind", () => {
+    const updated = resizeSegment(
+      [
+        { id: "a", categoryId: "work", startSlot: 0, endSlot: 4 },
+        { id: "b", categoryId: "work", startSlot: 8, endSlot: 12 }
+      ],
+      "b",
+      4,
+      12,
+      96
+    );
+
+    expect(updated).toEqual([{ id: "a", categoryId: "work", startSlot: 0, endSlot: 12 }]);
   });
 });
