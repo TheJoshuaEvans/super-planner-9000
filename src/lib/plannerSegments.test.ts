@@ -4,6 +4,7 @@ import {
   createSegment,
   getTimelineCompleteness,
   moveSegment,
+  moveSegmentAcrossLists,
   pasteSegmentsWithOverwrite,
   resizeSegment
 } from "./plannerSegments";
@@ -76,6 +77,51 @@ describe("plannerSegments", () => {
     expect(updated).toHaveLength(2);
     expect(updated[0]).toMatchObject({ id: "b", startSlot: 10, endSlot: 12 });
     expect(updated[1]).toMatchObject({ id: "a", startSlot: 12, endSlot: 16 });
+  });
+
+  it("moves a segment to another date's list, preserving its id and assigned meals", () => {
+    const { sourceSegments, targetSegments } = moveSegmentAcrossLists(
+      [{ id: "a", categoryId: "eat", startSlot: 4, endSlot: 8, assignedMealIds: ["meal-1"] }],
+      [{ id: "b", categoryId: "sleep", startSlot: 0, endSlot: 4 }],
+      "a",
+      20,
+      96
+    );
+
+    expect(sourceSegments).toEqual([]);
+    expect(targetSegments).toHaveLength(2);
+    expect(targetSegments.find((segment) => segment.id === "a")).toMatchObject({
+      id: "a",
+      categoryId: "eat",
+      startSlot: 20,
+      endSlot: 24,
+      assignedMealIds: ["meal-1"]
+    });
+  });
+
+  it("clamps the target start slot and overwrites overlapping target segments", () => {
+    const { sourceSegments, targetSegments } = moveSegmentAcrossLists(
+      [{ id: "a", categoryId: "work", startSlot: 4, endSlot: 8 }],
+      [{ id: "b", categoryId: "sleep", startSlot: 90, endSlot: 96 }],
+      "a",
+      100,
+      96
+    );
+
+    expect(sourceSegments).toEqual([]);
+    expect(targetSegments).toHaveLength(2);
+    expect(targetSegments.find((segment) => segment.id === "a")).toMatchObject({ startSlot: 92, endSlot: 96 });
+    expect(targetSegments.find((segment) => segment.id === "b")).toMatchObject({ startSlot: 90, endSlot: 92 });
+  });
+
+  it("returns lists unchanged when the segment id is not found", () => {
+    const sourceSegments = [{ id: "a", categoryId: "work", startSlot: 4, endSlot: 8 }];
+    const targetSegments = [{ id: "b", categoryId: "sleep", startSlot: 0, endSlot: 4 }];
+
+    const result = moveSegmentAcrossLists(sourceSegments, targetSegments, "missing", 10, 96);
+
+    expect(result.sourceSegments).toBe(sourceSegments);
+    expect(result.targetSegments).toBe(targetSegments);
   });
 
   it("resizes the right edge of a segment", () => {

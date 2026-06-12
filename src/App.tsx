@@ -1,7 +1,6 @@
 import CategoryPalette from "./components/CategoryPalette/CategoryPalette";
 import ConfirmDialog from "./components/ConfirmDialog/ConfirmDialog";
 import GoogleCalendarReconnectButton from "./components/Settings/GoogleCalendarReconnectButton";
-import MealAssignmentPanel from "./components/MealAssignmentPanel/MealAssignmentPanel";
 import MealCreator from "./components/MealCreator/MealCreator";
 import MonthlyWallCalendar from "./components/MonthlyWallCalendar/MonthlyWallCalendar";
 import PlannerHistoryControls from "./components/PlannerHistoryControls/PlannerHistoryControls";
@@ -10,6 +9,7 @@ import Settings from "./components/Settings/Settings";
 import ShoppingListPanel from "./components/ShoppingListPanel/ShoppingListPanel";
 import ToastViewport from "./components/ToastViewport/ToastViewport";
 import TimelineTrack from "./components/TimelineTrack/TimelineTrack";
+import type { CrossDragPreview } from "./components/TimelineTrack/timelineTrackInteractions";
 import { useGoogleCalendarTokenExpiry } from "./hooks/useGoogleCalendarTokenExpiry";
 import { usePlannerUndoRedoHotkeys } from "./hooks/usePlannerUndoRedoHotkeys";
 import {
@@ -32,7 +32,6 @@ import {
   formatPasteTargetLabel,
   getRelativeWeekDayLabel
 } from "./lib/plannerViewHelpers";
-import { formatSlotRangeLabelMeridiem } from "./lib/timeline";
 import { useConfirmDialogStore } from "./store/confirmDialogStore";
 import { usePlannerStore } from "./store/plannerStore";
 import { useMealStore } from "./store/mealStore";
@@ -63,6 +62,7 @@ function App() {
   const addCategoryForDate = usePlannerStore((state) => state.addCategoryForDate);
   const replacePlannerData = usePlannerStore((state) => state.replacePlannerData);
   const moveSegmentForDate = usePlannerStore((state) => state.moveSegmentForDate);
+  const moveSegmentAcrossDates = usePlannerStore((state) => state.moveSegmentAcrossDates);
   const resizeSegmentForDate = usePlannerStore((state) => state.resizeSegmentForDate);
   const deleteSegmentForDate = usePlannerStore((state) => state.deleteSegmentForDate);
   const clearSegmentsForDate = usePlannerStore((state) => state.clearSegmentsForDate);
@@ -90,6 +90,8 @@ function App() {
   const [copiedTimelineSegments, setCopiedTimelineSegments] = useState<PlannerSegment[] | null>(null);
   const [copiedTimelineSourceDateKey, setCopiedTimelineSourceDateKey] = useState<PlannerDateKey | null>(null);
   const [selectedDateKey, setSelectedDateKey] = useState<PlannerDateKey | null>(null);
+  const [crossDragPreview, setCrossDragPreview] = useState<CrossDragPreview | null>(null);
+  const trackElementsByDateKeyRef = useRef<Map<PlannerDateKey, HTMLDivElement>>(new Map());
   const [selectedEatSegment, setSelectedEatSegment] = useState<SelectedEatSegment | null>(null);
   const [pendingMealIds, setPendingMealIds] = useState<string[]>([]);
   const [isPortraitWarningDismissed, setIsPortraitWarningDismissed] = useState<boolean>(() => {
@@ -99,18 +101,11 @@ function App() {
 
     return window.sessionStorage.getItem(PORTRAIT_WARNING_SESSION_KEY) === "true";
   });
-  const importInputRef = useRef<HTMLInputElement | null>(null);
   const canPasteTimeline = copiedTimelineSegments !== null;
   const selectedDateSegments = selectedDateKey ? (segmentsByDate[selectedDateKey] ?? []) : [];
   const selectedDateTitle = selectedDateKey ? formatCalendarDateLabel(selectedDateKey) : "";
   const activeTabDefinition = getAppTabDefinition(activeTab);
   const isDashboardTab = activeTabDefinition.contentKind === "dashboard";
-  const selectedEatSegmentData = selectedEatSegment
-    ? (segmentsByDate[selectedEatSegment.dateKey] ?? []).find((segment) => segment.id === selectedEatSegment.segmentId)
-    : undefined;
-  const selectedEatSegmentLabel = selectedEatSegment && selectedEatSegmentData
-    ? `${formatCalendarDateLabel(selectedEatSegment.dateKey)} • ${formatSlotRangeLabelMeridiem(selectedEatSegmentData.startSlot, selectedEatSegmentData.endSlot)}`
-    : "";
 
   useEffect(() => {
     window.localStorage.setItem(ACTIVE_TAB_LOCAL_STORAGE_KEY, activeTab);
@@ -153,13 +148,6 @@ function App() {
       message: `Saved as ${anchor.download}.`,
       level: "success"
     });
-  }
-
-  /**
-   * Opens the file picker for a planner import.
-   */
-  function handleImportButtonClick(): void {
-    importInputRef.current?.click();
   }
 
   /**
@@ -206,6 +194,18 @@ function App() {
       });
     } finally {
       event.target.value = "";
+    }
+  }
+
+  /**
+   * Registers (or unregisters) a pinned timeline track's DOM element, keyed by date,
+   * so blocks can be dragged from one date's timeline into another's.
+   */
+  function handleRegisterTrackElement(dateKey: PlannerDateKey, element: HTMLDivElement | null): void {
+    if (element) {
+      trackElementsByDateKeyRef.current.set(dateKey, element);
+    } else {
+      trackElementsByDateKeyRef.current.delete(dateKey);
     }
   }
 
@@ -404,6 +404,10 @@ function App() {
         className={`min-h-screen bg-app-bg px-4 py-5 text-app-text lg:px-6 lg:py-6 ${selectedDateKey || selectedEatSegment ? "pb-[37rem] lg:pb-[39rem]" : "pb-32 lg:pb-36"} ${draggingCategoryId ? "cursor-grabbing" : ""}`}
         onPointerUp={isDashboardTab ? () => setDraggingCategoryId(null) : undefined}
       >
+        <div className="mx-auto flex w-full max-w-[96rem] justify-center pb-3">
+          <GoogleCalendarReconnectButton />
+        </div>
+
         <section className="mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-[96rem] flex-col gap-5 rounded-lg bg-app-panel p-5 shadow-card lg:min-h-[calc(100vh-3rem)] lg:p-6">
           <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-2">
@@ -414,43 +418,14 @@ function App() {
               <p className="max-w-3xl text-sm text-app-muted sm:text-base">{activeTabDefinition.description}</p>
             </div>
 
-            <div className="flex flex-col items-start gap-3 lg:items-end">
-              <div className="flex items-center gap-2" role="group" aria-label="App tabs">
-                <GoogleCalendarReconnectButton />
-
-                <div className="inline-flex rounded-lg border border-app-border bg-app-surface/90 p-1 shadow-sm">
-                  {renderTabButton(DASHBOARD_TAB)}
-                </div>
-
-                <div className="inline-flex rounded-lg border border-app-border bg-app-surface/90 p-1 shadow-sm">
-                  {OTHER_TABS.map(renderTabButton)}
-                </div>
+            <div className="flex items-center gap-2" role="group" aria-label="App tabs">
+              <div className="inline-flex rounded-lg border border-app-border bg-app-surface/90 p-1 shadow-sm">
+                {renderTabButton(DASHBOARD_TAB)}
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleExportPlannerData}
-                  className="rounded-md border border-app-border bg-app-panel/85 px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-app-muted transition hover:border-app-accent/70 hover:text-app-text"
-                >
-                  Export
-                </button>
-                <button
-                  type="button"
-                  onClick={handleImportButtonClick}
-                  className="rounded-md border border-app-border bg-app-panel/85 px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-app-muted transition hover:border-app-accent/70 hover:text-app-text"
-                >
-                  Import
-                </button>
+              <div className="inline-flex rounded-lg border border-app-border bg-app-surface/90 p-1 shadow-sm">
+                {OTHER_TABS.map(renderTabButton)}
               </div>
-
-              <input
-                ref={importInputRef}
-                type="file"
-                accept="application/json,.json"
-                className="hidden"
-                onChange={handleImportFileChange}
-              />
             </div>
           </header>
 
@@ -470,6 +445,9 @@ function App() {
                     meals={meals}
                     canPasteTimeline={canPasteTimeline}
                     onMoveSegment={(segmentId, nextStartSlot) => moveSegmentForDate(dateKey, segmentId, nextStartSlot)}
+                    onMoveSegmentAcrossDates={(segmentId, nextStartSlot, targetDateKey) =>
+                      moveSegmentAcrossDates(dateKey, segmentId, targetDateKey, nextStartSlot)
+                    }
                     onResizeSegment={(segmentId, nextStartSlot, nextEndSlot) =>
                       resizeSegmentForDate(dateKey, segmentId, nextStartSlot, nextEndSlot)
                     }
@@ -482,6 +460,19 @@ function App() {
                     }
                     onDeleteSegment={(segmentId) => deleteSegmentForDate(dateKey, segmentId)}
                     onEatSegmentClick={(segment) => handleMealEatSegmentClick(dateKey, segment)}
+                    selectedEatSegmentId={
+                      selectedEatSegment?.dateKey === dateKey && dateKey !== selectedDateKey
+                        ? selectedEatSegment.segmentId
+                        : null
+                    }
+                    pendingMealIds={pendingMealIds}
+                    onToggleAssignedMeal={handleToggleAssignedMeal}
+                    onSubmitMealAssignment={handleSubmitMealAssignment}
+                    onCloseMealAssignment={handleCloseMealAssignment}
+                    trackElementsByDateKey={trackElementsByDateKeyRef}
+                    registerTrackElement={(element) => handleRegisterTrackElement(dateKey, element)}
+                    crossDragPreview={crossDragPreview?.targetDateKey === dateKey ? crossDragPreview : null}
+                    onCrossTrackHoverChange={setCrossDragPreview}
                     showCurrentTimeMarker={dayOffset === 0}
                   />
                 );
@@ -504,7 +495,7 @@ function App() {
               <MealCreator />
             </section>
           ) : activeTabDefinition.contentKind === "settings" ? (
-            <Settings />
+            <Settings onExportPlannerData={handleExportPlannerData} onImportFileChange={handleImportFileChange} />
           ) : (
             <section className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-app-border bg-app-surface/70 px-6 py-16 text-center">
               <div className="max-w-md">
@@ -562,19 +553,15 @@ function App() {
                     }
                     onDeleteSegment={(segmentId) => deleteSegmentForDate(selectedDateKey, segmentId)}
                     onEatSegmentClick={(segment) => handleMealEatSegmentClick(selectedDateKey, segment)}
+                    selectedEatSegmentId={
+                      selectedEatSegment?.dateKey === selectedDateKey ? selectedEatSegment.segmentId : null
+                    }
+                    pendingMealIds={pendingMealIds}
+                    onToggleAssignedMeal={handleToggleAssignedMeal}
+                    onSubmitMealAssignment={handleSubmitMealAssignment}
+                    onCloseMealAssignment={handleCloseMealAssignment}
                   />
                 </div>
-              ) : null}
-
-              {selectedEatSegment ? (
-                <MealAssignmentPanel
-                  contextLabel={selectedEatSegmentLabel}
-                  meals={meals}
-                  selectedMealIds={pendingMealIds}
-                  onToggleMeal={handleToggleAssignedMeal}
-                  onSubmit={handleSubmitMealAssignment}
-                  onClose={handleCloseMealAssignment}
-                />
               ) : null}
 
               <CategoryPalette

@@ -215,3 +215,39 @@ export function moveSegment(
   const remainingSegments = existingSegments.filter((segment) => segment.id !== segmentId);
   return applySegmentOverwrite(remainingSegments, movedSegment);
 }
+
+/**
+ * Moves a segment from one date's segment list to another, preserving its
+ * duration and any additional data (e.g. assigned meals).
+ */
+export function moveSegmentAcrossLists(
+  sourceSegments: PlannerSegment[],
+  targetSegments: PlannerSegment[],
+  segmentId: string,
+  nextStartSlot: number,
+  totalDaySlots: number
+): { sourceSegments: PlannerSegment[]; targetSegments: PlannerSegment[] } {
+  const segmentToMove = sourceSegments.find((segment) => segment.id === segmentId);
+
+  if (!segmentToMove) {
+    return { sourceSegments, targetSegments };
+  }
+
+  const duration = segmentToMove.endSlot - segmentToMove.startSlot;
+
+  if (duration <= 0) {
+    return { sourceSegments, targetSegments };
+  }
+
+  const maxStart = Math.max(0, totalDaySlots - duration);
+  const clampedStart = Math.min(maxStart, Math.max(0, clampSlot(nextStartSlot)));
+  const movedSegment = cloneSegment(segmentToMove, {
+    startSlot: clampedStart,
+    endSlot: clampedStart + duration
+  });
+
+  const remainingSource = sourceSegments.filter((segment) => segment.id !== segmentId);
+  const nextTargetSegments = applySegmentOverwrite(targetSegments, movedSegment);
+
+  return { sourceSegments: remainingSource, targetSegments: nextTargetSegments };
+}

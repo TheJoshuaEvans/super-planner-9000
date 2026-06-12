@@ -68,6 +68,17 @@ export type PlannerStore = PlannerState & {
   moveSegmentForDate: (dateKey: PlannerDateKey, segmentId: string, nextStartSlot: number) => void;
 
   /**
+   * Moves an existing segment from one date's timeline to another, preserving its
+   * duration and any additional data (e.g. assigned meals).
+   */
+  moveSegmentAcrossDates: (
+    sourceDateKey: PlannerDateKey,
+    segmentId: string,
+    targetDateKey: PlannerDateKey,
+    nextStartSlot: number
+  ) => void;
+
+  /**
    * Resizes an existing segment for a date to a new slot range.
    */
   resizeSegmentForDate: (dateKey: PlannerDateKey, segmentId: string, nextStartSlot: number, nextEndSlot: number) => void;

@@ -27,6 +27,14 @@ export type ResizeInteraction = {
 
 export type InteractionState = MoveInteraction | ResizeInteraction;
 
+/** Live preview of a block being dragged from one date's timeline into another's. */
+export type CrossDragPreview = {
+  targetDateKey: string;
+  previewStartSlot: number;
+  duration: number;
+  categoryId: string;
+};
+
 const MIN_RESIZE_SLOTS = 1;
 
 /** Maximum pointer travel (in pixels) for a press-release to still count as a click rather than a drag. */
@@ -105,6 +113,24 @@ export function resolveDropPreviewSlot(clientX: number, trackLeft: number, track
  */
 export function isPointerInRect(clientX: number, clientY: number, rect: Pick<DOMRect, "left" | "right" | "top" | "bottom">): boolean {
   return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+}
+
+/**
+ * Finds which registered timeline track (if any) a pointer position currently lies over,
+ * for detecting when a block is being dragged into a different date's timeline.
+ *
+ * @param trackRects - Candidate tracks (excluding the source track) with their bounding rects.
+ * @param clientX - Pointer x-coordinate in viewport pixels.
+ * @param clientY - Pointer y-coordinate in viewport pixels.
+ * @returns The date key of the track under the pointer, or null if none match.
+ */
+export function findCrossTrackTargetDateKey(
+  trackRects: { dateKey: string; rect: Pick<DOMRect, "left" | "right" | "top" | "bottom"> }[],
+  clientX: number,
+  clientY: number
+): string | null {
+  const match = trackRects.find(({ rect }) => isPointerInRect(clientX, clientY, rect));
+  return match?.dateKey ?? null;
 }
 
 /**

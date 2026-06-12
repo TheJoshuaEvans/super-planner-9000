@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode, type RefObject } from "react";
 import {
   clientXToSlot,
   DEFAULT_SEGMENT_DURATION_SLOTS,
@@ -14,16 +14,19 @@ import { useTimelineMarkerClock } from "../../hooks/useTimelineMarkerClock";
 import type { Meal } from "../../store/mealStore.types";
 import type { PlannerCategory, PlannerSegment } from "../../store/plannerStore";
 import {
+  findCrossTrackTargetDateKey,
   isClickInteraction,
   isPointerInRect,
   resolveDropPreviewSlot,
   resolveMoveStart,
   resolveResizeRange,
+  type CrossDragPreview,
   type InteractionState,
   type MoveInteraction,
   type ResizeInteraction
 } from "./timelineTrackInteractions";
 import { getTimelineControlButtonClassName } from "../shared/timelineControlButton";
+import MealAssignmentPanel from "../MealAssignmentPanel/MealAssignmentPanel";
 import MiniTimeline from "../shared/MiniTimeline";
 import TimelineHourRuler from "../shared/TimelineHourRuler";
 import TimelineQuarterHourGrid from "../shared/TimelineQuarterHourGrid";
@@ -40,6 +43,7 @@ type TimelineTrackProps = {
   canPasteTimeline: boolean;
   draggingCategoryId: string | null;
   onMoveSegment: (segmentId: string, nextStartSlot: number) => void;
+  onMoveSegmentAcrossDates?: (segmentId: string, nextStartSlot: number, targetDateKey: string) => void;
   onResizeSegment: (segmentId: string, nextStartSlot: number, nextEndSlot: number) => void;
   onDropCategory: (categoryId: string, startSlot: number, endSlot: number) => void;
   onCopyTimeline: () => void;
@@ -47,8 +51,17 @@ type TimelineTrackProps = {
   onClearTimeline: () => void;
   onDeleteSegment: (segmentId: string) => void;
   onEatSegmentClick?: (segment: PlannerSegment) => void;
+  selectedEatSegmentId?: string | null;
+  pendingMealIds?: string[];
+  onToggleAssignedMeal?: (mealId: string) => void;
+  onSubmitMealAssignment?: () => void;
+  onCloseMealAssignment?: () => void;
   footer?: ReactNode;
   showCurrentTimeMarker?: boolean;
+  trackElementsByDateKey?: RefObject<Map<string, HTMLDivElement>>;
+  registerTrackElement?: (element: HTMLDivElement | null) => void;
+  crossDragPreview?: CrossDragPreview | null;
+  onCrossTrackHoverChange?: (preview: CrossDragPreview | null) => void;
 };
 
 /**
@@ -65,6 +78,7 @@ function TimelineTrack({
   canPasteTimeline,
   draggingCategoryId,
   onMoveSegment,
+  onMoveSegmentAcrossDates,
   onResizeSegment,
   onDropCategory,
   onCopyTimeline,
@@ -72,8 +86,17 @@ function TimelineTrack({
   onClearTimeline,
   onDeleteSegment,
   onEatSegmentClick,
+  selectedEatSegmentId = null,
+  pendingMealIds = [],
+  onToggleAssignedMeal,
+  onSubmitMealAssignment,
+  onCloseMealAssignment,
   footer,
-  showCurrentTimeMarker = false
+  showCurrentTimeMarker = false,
+  trackElementsByDateKey,
+  registerTrackElement,
+  crossDragPreview = null,
+  onCrossTrackHoverChange
 }: TimelineTrackProps) {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const trashRef = useRef<HTMLDivElement | null>(null);
@@ -81,6 +104,12 @@ function TimelineTrack({
   const [dropPreviewSlot, setDropPreviewSlot] = useState<number | null>(null);
   const [isTrashHot, setIsTrashHot] = useState(false);
   const currentTime = useTimelineMarkerClock({ enabled: showCurrentTimeMarker });
+
+  useEffect(() => {
+    if (!registerTrackElement) return;
+    registerTrackElement(trackRef.current);
+    return () => registerTrackElement(null);
+  }, [registerTrackElement]);
 
   const categoriesById = useMemo(
     () => new Map(categories.map((category) => [category.id, category])),
@@ -121,6 +150,14 @@ function TimelineTrack({
   const hasUnassignedMeals = useMemo(
     () => hasUnassignedEatSegment(segments, meals),
     [segments, meals]
+  );
+
+  const selectedEatSegment = useMemo(
+    () =>
+      selectedEatSegmentId
+        ? segments.find((segment) => segment.id === selectedEatSegmentId && segment.categoryId === "eat")
+        : undefined,
+    [segments, selectedEatSegmentId]
   );
 
   /**
@@ -177,6 +214,26 @@ function TimelineTrack({
   }
 
   /**
+   * Finds the other registered timeline track (by date key) currently under the pointer,
+   * for dragging a block from this track into another date's timeline.
+   */
+  function findCrossDragTarget(clientX: number, clientY: number): { dateKey: string; element: HTMLDivElement } | null {
+    const trackElements = trackElementsByDateKey?.current;
+    if (!trackElements) return null;
+
+    const candidates: { dateKey: string; rect: DOMRect }[] = [];
+    trackElements.forEach((element, candidateDateKey) => {
+      if (candidateDateKey === dateKey) return;
+      candidates.push({ dateKey: candidateDateKey, rect: element.getBoundingClientRect() });
+    });
+
+    const targetDateKey = findCrossTrackTargetDateKey(candidates, clientX, clientY);
+    const targetElement = targetDateKey ? trackElements.get(targetDateKey) : undefined;
+
+    return targetDateKey && targetElement ? { dateKey: targetDateKey, element: targetElement } : null;
+  }
+
+  /**
    * Updates the preview position for whichever interaction is currently active.
    * Also tracks drop preview position when a category is being dragged in from the palette.
    */
@@ -197,6 +254,21 @@ function TimelineTrack({
       const trashRect = trashRef.current?.getBoundingClientRect();
       setIsTrashHot(trashRect ? isPointerInRect(event.clientX, event.clientY, trashRect) : false);
       setInteraction((prev) => prev ? { ...prev, previewStartSlot: nextStart } as MoveInteraction : prev);
+
+      const crossDragTarget = findCrossDragTarget(event.clientX, event.clientY);
+
+      if (crossDragTarget && onCrossTrackHoverChange) {
+        const targetRect = crossDragTarget.element.getBoundingClientRect();
+        const draggedSegment = segments.find((segment) => segment.id === interaction.segmentId);
+        onCrossTrackHoverChange({
+          targetDateKey: crossDragTarget.dateKey,
+          previewStartSlot: resolveMoveStart(event.clientX, interaction, targetRect.left, targetRect.width),
+          duration: interaction.duration,
+          categoryId: draggedSegment?.categoryId ?? ""
+        });
+      } else {
+        onCrossTrackHoverChange?.(null);
+      }
     } else {
       const trackRect = trackRef.current.getBoundingClientRect();
       const { startSlot, endSlot } = resolveResizeRange(event.clientX, interaction, trackRect.left, trackRect.width);
@@ -245,13 +317,22 @@ function TimelineTrack({
         return;
       }
 
-      onMoveSegment(interaction.segmentId, interaction.previewStartSlot);
+      const crossDragTarget = onMoveSegmentAcrossDates ? findCrossDragTarget(event.clientX, event.clientY) : null;
+
+      if (crossDragTarget) {
+        const targetRect = crossDragTarget.element.getBoundingClientRect();
+        const nextStart = resolveMoveStart(event.clientX, interaction, targetRect.left, targetRect.width);
+        onMoveSegmentAcrossDates?.(interaction.segmentId, nextStart, crossDragTarget.dateKey);
+      } else {
+        onMoveSegment(interaction.segmentId, interaction.previewStartSlot);
+      }
     } else {
       onResizeSegment(interaction.segmentId, interaction.previewStartSlot, interaction.previewEndSlot);
     }
 
     setInteraction(null);
     setIsTrashHot(false);
+    onCrossTrackHoverChange?.(null);
   }
 
   /**
@@ -261,10 +342,17 @@ function TimelineTrack({
     setInteraction(null);
     setDropPreviewSlot(null);
     setIsTrashHot(false);
+    onCrossTrackHoverChange?.(null);
   }
 
   return (
-    <section className="flex flex-col gap-4 rounded-lg border border-app-border bg-app-surface p-4">
+    <section
+      className={`flex flex-col gap-4 rounded-lg border p-4 transition-colors ${
+        crossDragPreview
+          ? "border-app-accent bg-app-accent/10 ring-2 ring-app-accent/60"
+          : "border-app-border bg-app-surface"
+      }`}
+    >
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-lg font-semibold">
@@ -361,7 +449,7 @@ function TimelineTrack({
                   >
                     <div aria-hidden="true" className="h-full w-[2px] bg-app-accent/55 shadow-[0_0_0_1px_rgba(255,255,255,0.28)]" />
                     <div className="pointer-events-auto absolute -top-4 left-1/2 -translate-x-1/2">
-                      <Tooltip content={currentTimeLabel}>
+                      <Tooltip content={currentTimeLabel} boundaryRef={trackRef}>
                         <button
                           type="button"
                           className="h-2.5 w-2.5 rounded-full border border-white/60 bg-app-accent/90 shadow-[0_0_0_2px_rgba(13,18,31,0.45)] outline-none transition-transform duration-150 hover:scale-110 focus-visible:scale-110 focus-visible:ring-2 focus-visible:ring-app-accent/60"
@@ -372,7 +460,7 @@ function TimelineTrack({
                   </div>
                 ) : null}
 
-                {visibleSegments.length === 0 && dropPreviewSlot === null ? (
+                {visibleSegments.length === 0 && dropPreviewSlot === null && !crossDragPreview ? (
                   <div className="flex h-full items-center justify-center rounded-md border border-dashed border-app-border bg-app-surface/60 text-sm text-app-muted">
                     Empty timeline. Drag a category below to create the first block.
                   </div>
@@ -470,6 +558,29 @@ function TimelineTrack({
                         </div>
                       );
                     })()}
+
+                    {crossDragPreview && (() => {
+                      const previewCategory = categoriesById.get(crossDragPreview.categoryId);
+                      const previewEnd = crossDragPreview.previewStartSlot + crossDragPreview.duration;
+                      return (
+                        <div
+                          className="pointer-events-none absolute inset-y-0 rounded-md border-2 border-white/60 opacity-70 shadow-md"
+                          style={{
+                            left: `${(crossDragPreview.previewStartSlot / TOTAL_DAY_SLOTS) * 100}%`,
+                            width: `${(crossDragPreview.duration / TOTAL_DAY_SLOTS) * 100}%`,
+                            backgroundColor: previewCategory?.color ?? "#475569",
+                            zIndex: 20
+                          }}
+                        >
+                          <div className="flex h-full flex-col justify-between overflow-hidden px-3 py-2 text-white">
+                            <span className="truncate text-sm font-semibold">{previewCategory?.label}</span>
+                            <span className="truncate text-xs text-white/85">
+                              {formatSlotRangeLabelMeridiem(crossDragPreview.previewStartSlot, previewEnd)}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </>
                 )}
               </div>
@@ -480,6 +591,19 @@ function TimelineTrack({
           </div>
         </div>
       </div>
+
+      {selectedEatSegment && onToggleAssignedMeal && onSubmitMealAssignment && onCloseMealAssignment ? (
+        <div className="border-t border-app-border pt-3">
+          <MealAssignmentPanel
+            contextLabel={formatSlotRangeLabelMeridiem(selectedEatSegment.startSlot, selectedEatSegment.endSlot)}
+            meals={meals}
+            selectedMealIds={pendingMealIds}
+            onToggleMeal={onToggleAssignedMeal}
+            onSubmit={onSubmitMealAssignment}
+            onClose={onCloseMealAssignment}
+          />
+        </div>
+      ) : null}
 
       {eatSegmentsWithMeals.length > 0 ? (
         <div className="space-y-2 border-t border-app-border pt-3">

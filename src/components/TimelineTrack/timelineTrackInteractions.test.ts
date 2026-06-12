@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  findCrossTrackTargetDateKey,
   isClickInteraction,
   isPointerInRect,
   resolveDropPreviewSlot,
@@ -75,5 +76,20 @@ describe("timelineTrackInteractions", () => {
 
   it("rejects a click when the press is held longer than the duration threshold", () => {
     expect(isClickInteraction(100, 100, 1000, 101, 100, 1400)).toBe(false);
+  });
+
+  it("finds the track whose rect contains the pointer", () => {
+    const trackRects = [
+      { dateKey: "2026-06-10", rect: { left: 0, right: 100, top: 0, bottom: 50 } },
+      { dateKey: "2026-06-11", rect: { left: 0, right: 100, top: 60, bottom: 110 } }
+    ];
+
+    expect(findCrossTrackTargetDateKey(trackRects, 50, 80)).toBe("2026-06-11");
+  });
+
+  it("returns null when the pointer is outside every candidate track", () => {
+    const trackRects = [{ dateKey: "2026-06-10", rect: { left: 0, right: 100, top: 0, bottom: 50 } }];
+
+    expect(findCrossTrackTargetDateKey(trackRects, 50, 200)).toBeNull();
   });
 });

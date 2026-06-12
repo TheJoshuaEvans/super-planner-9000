@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { applySegmentOverwrite, createSegment, moveSegment, pasteSegmentsWithOverwrite, resizeSegment } from "../lib/plannerSegments";
+import { applySegmentOverwrite, createSegment, moveSegment, moveSegmentAcrossLists, pasteSegmentsWithOverwrite, resizeSegment } from "../lib/plannerSegments";
 import { TOTAL_DAY_SLOTS } from "../lib/timeline";
 import { segmentsForDate } from "./plannerStoreData";
 import {
@@ -84,6 +84,29 @@ export const usePlannerStore = create<PlannerStore>()(
             [dateKey]: moveSegment(segmentsForDate(state, dateKey), segmentId, nextStartSlot, TOTAL_DAY_SLOTS)
           })
         ),
+      moveSegmentAcrossDates: (sourceDateKey, segmentId, targetDateKey, nextStartSlot) =>
+        set((state) => {
+          if (sourceDateKey === targetDateKey) {
+            return applyTimelineEdit(state, {
+              ...state.segmentsByDate,
+              [sourceDateKey]: moveSegment(segmentsForDate(state, sourceDateKey), segmentId, nextStartSlot, TOTAL_DAY_SLOTS)
+            });
+          }
+
+          const { sourceSegments, targetSegments } = moveSegmentAcrossLists(
+            segmentsForDate(state, sourceDateKey),
+            segmentsForDate(state, targetDateKey),
+            segmentId,
+            nextStartSlot,
+            TOTAL_DAY_SLOTS
+          );
+
+          return applyTimelineEdit(state, {
+            ...state.segmentsByDate,
+            [sourceDateKey]: sourceSegments,
+            [targetDateKey]: targetSegments
+          });
+        }),
       resizeSegmentForDate: (dateKey, segmentId, nextStartSlot, nextEndSlot) =>
         set((state) =>
           applyTimelineEdit(state, {
