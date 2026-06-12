@@ -31,6 +31,13 @@ export const APP_TABS = [
     kicker: "Settings",
     description: "Stub page for upcoming app settings and integrations, such as Google Calendar sync.",
     contentKind: "settings"
+  },
+  {
+    id: "about",
+    label: "About",
+    kicker: "About This App",
+    description: "Learn about the app's purpose, features, and development roadmap.",
+    contentKind: "about"
   }
 ] as const;
 

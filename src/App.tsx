@@ -1,3 +1,4 @@
+import About from "./components/About/About";
 import CategoryPalette from "./components/CategoryPalette/CategoryPalette";
 import ConfirmDialog from "./components/ConfirmDialog/ConfirmDialog";
 import GoogleCalendarReconnectButton from "./components/Settings/GoogleCalendarReconnectButton";
@@ -514,6 +515,8 @@ function App() {
             </section>
           ) : activeTabDefinition.contentKind === "settings" ? (
             <Settings onExportPlannerData={handleExportPlannerData} onImportFileChange={handleImportFileChange} />
+          ) : activeTabDefinition.contentKind === "about" ? (
+            <About />
           ) : (
             <section className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-app-border bg-app-surface/70 px-6 py-16 text-center">
               <div className="max-w-md">
