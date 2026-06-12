@@ -104,6 +104,21 @@ export type PlannerStore = PlannerState & {
   clearSegmentsForDate: (dateKey: PlannerDateKey) => void;
 
   /**
+   * Adds a new category with the given label and color.
+   */
+  addCategory: (label: string, color: string) => void;
+
+  /**
+   * Updates an existing category's label and/or color.
+   */
+  updateCategory: (categoryId: string, updates: { label?: string; color?: string }) => void;
+
+  /**
+   * Removes a category (if not protected) and deletes any segments using it.
+   */
+  removeCategory: (categoryId: string) => void;
+
+  /**
    * Replaces all persisted planner data and clears history.
    */
   replacePlannerData: (data: PlannerPersistedData) => void;

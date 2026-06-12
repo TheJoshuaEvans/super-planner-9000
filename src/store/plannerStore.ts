@@ -1,9 +1,11 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { createCategoryId, isProtectedCategory, removeSegmentsForCategory } from "../lib/plannerCategories";
 import { applySegmentOverwrite, createSegment, moveSegment, moveSegmentAcrossLists, pasteSegmentsWithOverwrite, resizeSegment } from "../lib/plannerSegments";
 import { TOTAL_DAY_SLOTS } from "../lib/timeline";
 import { segmentsForDate } from "./plannerStoreData";
 import {
+  applyCategoryEdit,
   applyTimelineEdit,
   rebaseHistory,
   redoTimelineEdit,
@@ -144,6 +146,48 @@ export const usePlannerStore = create<PlannerStore>()(
             [dateKey]: []
           })
         ),
+      addCategory: (label, color) =>
+        set((state) => {
+          const trimmedLabel = label.trim();
+
+          if (trimmedLabel === "") {
+            return state;
+          }
+
+          return applyCategoryEdit(
+            state,
+            [...state.categories, { id: createCategoryId(), label: trimmedLabel, color }],
+            state.segmentsByDate
+          );
+        }),
+      updateCategory: (categoryId, updates) =>
+        set((state) =>
+          applyCategoryEdit(
+            state,
+            state.categories.map((category) =>
+              category.id === categoryId
+                ? {
+                    ...category,
+                    ...(updates.label !== undefined ? { label: updates.label.trim() } : {}),
+                    ...(updates.color !== undefined ? { color: updates.color } : {})
+                  }
+                : category
+            ),
+            state.segmentsByDate
+          )
+        ),
+      removeCategory: (categoryId) =>
+        set((state) => {
+          if (isProtectedCategory(categoryId) || !state.categories.some((category) => category.id === categoryId)) {
+            return state;
+          }
+
+          return applyCategoryEdit(
+            state,
+            state.categories.filter((category) => category.id !== categoryId),
+            removeSegmentsForCategory(state.segmentsByDate, categoryId)
+          );
+        }),
       replacePlannerData: (data) =>
         set((state) => rebaseHistory(state, data)),
       resetPlanner: () => set((state) => rebaseHistory(state, initialState)),

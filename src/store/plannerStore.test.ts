@@ -255,6 +255,81 @@ describe("plannerStore", () => {
     expect(usePlannerStore.getState().canRedo).toBe(false);
   });
 
+  it("adds a new category", () => {
+    usePlannerStore.getState().addCategory("Hobby", "#123456");
+
+    const categories = usePlannerStore.getState().categories;
+    expect(categories).toHaveLength(6);
+    expect(categories[5]).toMatchObject({ label: "Hobby", color: "#123456" });
+    expect(categories[5].id).toBeTruthy();
+  });
+
+  it("ignores adding a category with a blank label", () => {
+    usePlannerStore.getState().addCategory("   ", "#123456");
+
+    expect(usePlannerStore.getState().categories).toHaveLength(5);
+    expect(usePlannerStore.getState().canUndo).toBe(false);
+  });
+
+  it("renames and recolors an existing category, including the protected Eat category", () => {
+    usePlannerStore.getState().updateCategory("eat", { label: "Dining", color: "#abcdef" });
+
+    const eat = usePlannerStore.getState().categories.find((category) => category.id === "eat");
+    expect(eat).toMatchObject({ id: "eat", label: "Dining", color: "#abcdef" });
+  });
+
+  it("trims renamed category labels", () => {
+    usePlannerStore.getState().updateCategory("work", { label: "  Job  " });
+
+    const work = usePlannerStore.getState().categories.find((category) => category.id === "work");
+    expect(work?.label).toBe("Job");
+  });
+
+  it("removes a category with no segments", () => {
+    usePlannerStore.getState().removeCategory("travel");
+
+    const categories = usePlannerStore.getState().categories;
+    expect(categories.map((category) => category.id)).toEqual(["sleep", "work", "play", "eat"]);
+  });
+
+  it("removes a category and deletes its segments across dates", () => {
+    const store = usePlannerStore.getState();
+    store.addCategoryForDate(DATE_A, "travel", 0, 4);
+    store.addCategoryForDate(DATE_B, "travel", 8, 12);
+    store.addCategoryForDate(DATE_B, "work", 12, 16);
+
+    store.removeCategory("travel");
+
+    const state = usePlannerStore.getState();
+    expect(state.categories.map((category) => category.id)).toEqual(["sleep", "work", "play", "eat"]);
+    expect(state.segmentsByDate[DATE_A]).toEqual([]);
+    expect(state.segmentsByDate[DATE_B]).toHaveLength(1);
+    expect(state.segmentsByDate[DATE_B][0]).toMatchObject({ categoryId: "work" });
+  });
+
+  it("refuses to remove a protected category", () => {
+    usePlannerStore.getState().removeCategory("eat");
+
+    const state = usePlannerStore.getState();
+    expect(state.categories.map((category) => category.id)).toEqual(["sleep", "work", "play", "eat", "travel"]);
+    expect(state.canUndo).toBe(false);
+  });
+
+  it("supports undo and redo for category edits", () => {
+    const store = usePlannerStore.getState();
+
+    store.addCategory("Hobby", "#123456");
+    expect(usePlannerStore.getState().categories).toHaveLength(6);
+    expect(usePlannerStore.getState().canUndo).toBe(true);
+
+    store.undoPlannerEdit();
+    expect(usePlannerStore.getState().categories).toHaveLength(5);
+    expect(usePlannerStore.getState().canRedo).toBe(true);
+
+    store.redoPlannerEdit();
+    expect(usePlannerStore.getState().categories).toHaveLength(6);
+  });
+
   it("rebases and clears history on replacePlannerData", () => {
     const store = usePlannerStore.getState();
 

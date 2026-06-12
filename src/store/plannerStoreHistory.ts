@@ -11,6 +11,7 @@ import {
   toPersistedData
 } from "./plannerStoreData";
 import type {
+  PlannerCategory,
   PlannerHistoryState,
   PlannerPersistedData,
   PlannerSegmentsByDate,
@@ -45,6 +46,47 @@ export function applyTimelineEdit(
   const current = toPersistedData(state);
   const next: PlannerPersistedData = {
     categories: state.categories,
+    segmentsByDate: nextSegmentsByDate
+  };
+
+  const result = recordPlannerHistory({
+    current,
+    next,
+    history: state.history,
+    clone: clonePersistedData,
+    equals: arePersistedDataEqual,
+    limit: DEFAULT_HISTORY_LIMIT
+  });
+
+  if (!result.changed) {
+    return state;
+  }
+
+  return {
+    ...state,
+    categories: result.present.categories,
+    segmentsByDate: result.present.segmentsByDate,
+    ...withHistoryFlags(result.history)
+  };
+}
+
+/**
+ * Applies a category edit (add, rename, recolor, or remove) and records history when persisted
+ * data changes.
+ *
+ * @param state - Current planner state.
+ * @param nextCategories - Proposed categories list after edit.
+ * @param nextSegmentsByDate - Proposed segment map after edit.
+ * @returns Updated state, or original state if edit is a no-op.
+ */
+export function applyCategoryEdit(
+  state: PlannerState,
+  nextCategories: PlannerCategory[],
+  nextSegmentsByDate: PlannerSegmentsByDate
+): PlannerState {
+  const current = toPersistedData(state);
+  const next: PlannerPersistedData = {
+    categories: nextCategories,
     segmentsByDate: nextSegmentsByDate
   };
 
