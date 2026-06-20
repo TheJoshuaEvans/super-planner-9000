@@ -55,13 +55,16 @@ function WorkEntryDock({ dateKey, dateLabel, entries, projects, onClose }: WorkE
   const canSave = selectedProjectId.length > 0 && parsedHours !== null;
 
   /**
-   * Opens the add form with an empty state and a default project selection.
+   * Opens the add form with an empty state, defaulting the project to whichever was last used
+   * so logging the same project across several days in a row doesn't require reselecting it.
    */
   function handleStartAdd(): void {
     setMode("add");
     setEditingEntryId(null);
     setInputMode("hours");
-    setSelectedProjectId(projects[0]?.id ?? "");
+    setSelectedProjectId((current) =>
+      current && projects.some((project) => project.id === current) ? current : projects[0]?.id ?? ""
+    );
     setHoursText("");
     setStartTime("");
     setEndTime("");

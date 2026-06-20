@@ -17,7 +17,8 @@
       "Bash(timeout 30 bash -c 'until tmux capture-pane -t app2 -p | tail -3 | grep -q launched; do sleep 0.5; done')",
       "Bash(tmux ls *)",
       "Bash(npx tsc *)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(tmux list-sessions *)"
     ]
   }
 }
