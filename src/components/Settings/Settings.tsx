@@ -1,9 +1,11 @@
 import type { ChangeEvent } from "react";
 import CategoriesPanel from "./CategoriesPanel";
+import ClientsPanel from "./ClientsPanel";
 import GoogleCalendarPanel from "./GoogleCalendarPanel";
 import GoogleDrivePanel from "./GoogleDrivePanel";
 import NotificationsPanel from "./NotificationsPanel";
 import PlannerDataPanel from "./PlannerDataPanel";
+import ProjectsPanel from "./ProjectsPanel";
 
 type SettingsProps = {
   onExportPlannerData: () => void;
@@ -18,6 +20,10 @@ function Settings({ onExportPlannerData, onImportFileChange }: SettingsProps) {
   return (
     <section className="flex flex-1 flex-col gap-5">
       <CategoriesPanel />
+
+      <ClientsPanel />
+
+      <ProjectsPanel />
 
       <GoogleCalendarPanel />
 

@@ -1,3 +1,4 @@
+import { COLORBLIND_SAFE_PALETTE } from "./colorPalette";
 import type { PlannerCategory, PlannerSegmentsByDate } from "../store/plannerStore";
 
 /**
@@ -9,16 +10,7 @@ export const PROTECTED_CATEGORY_IDS: readonly string[] = ["eat"];
 /**
  * A small colorblind-safe (Okabe-Ito derived) palette suggested for newly created categories.
  */
-export const DEFAULT_CATEGORY_COLOR_PALETTE: readonly string[] = [
-  "#E69F00",
-  "#56B4E9",
-  "#009E73",
-  "#F0E442",
-  "#0072B2",
-  "#D55E00",
-  "#CC79A7",
-  "#999999"
-];
+export const DEFAULT_CATEGORY_COLOR_PALETTE: readonly string[] = COLORBLIND_SAFE_PALETTE;
 
 /**
  * Returns true if a category id cannot be removed via Settings.

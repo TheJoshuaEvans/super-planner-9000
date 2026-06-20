@@ -40,6 +40,7 @@ import {
 import { useConfirmDialogStore } from "./store/confirmDialogStore";
 import { usePlannerStore } from "./store/plannerStore";
 import { useMealStore } from "./store/mealStore";
+import { useWorkTrackerStore } from "./store/workTrackerStore";
 import { useEffect, useRef, useState, type ChangeEvent, type ReactElement } from "react";
 import { useToastStore } from "./store/toastStore";
 import type { PlannerDateKey, PlannerSegment } from "./store/plannerStore";
@@ -138,9 +139,15 @@ function App() {
   function handleExportPlannerData(): void {
     const plannerState = usePlannerStore.getState();
     const mealState = useMealStore.getState();
+    const workTrackerState = useWorkTrackerStore.getState();
     const exportedJson = serializePlannerDataExport(
       { categories: plannerState.categories, segmentsByDate: plannerState.segmentsByDate },
-      { components: mealState.components, meals: mealState.meals }
+      { components: mealState.components, meals: mealState.meals },
+      {
+        clients: workTrackerState.clients,
+        projects: workTrackerState.projects,
+        entriesByDate: workTrackerState.entriesByDate
+      }
     );
     const blob = new Blob([exportedJson], { type: "application/json;charset=utf-8" });
     const downloadUrl = URL.createObjectURL(blob);
@@ -186,6 +193,7 @@ function App() {
 
       replacePlannerData(parsed.data);
       useMealStore.getState().replaceMealData(parsed.meals);
+      useWorkTrackerStore.getState().replaceWorkTrackerData(parsed.workTracker);
       setSelectedDateKey(null);
       setCopiedTimelineSegments(null);
       setCopiedTimelineSourceDateKey(null);

@@ -25,7 +25,8 @@ export const APP_TABS = [
     id: "work-tracker",
     label: "Work Tracker",
     kicker: "Work Tracker",
-    description: "Stub page for upcoming work tracking features.",
+    description:
+      "Track hours worked per project against a monthly expected-hours target. Click a calendar day to log hours for a project, either as a raw number or a time range.",
     group: "primary",
     contentKind: "work-tracker"
   },

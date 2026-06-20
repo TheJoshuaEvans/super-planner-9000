@@ -33,27 +33,44 @@ const sampleMealData = {
   ]
 };
 
+const emptyWorkTrackerData = { clients: [], projects: [], entriesByDate: {} };
+
+const sampleWorkTrackerData = {
+  clients: [{ id: "client-1", name: "Acme Co" }],
+  projects: [{ id: "project-1", name: "Website", color: "#E69F00", clientId: "client-1" }],
+  entriesByDate: {
+    "2026-06-09": [{ id: "entry-1", projectId: "project-1", hours: 4 }]
+  }
+};
+
 describe("plannerDataIO", () => {
   it("creates a versioned export envelope", () => {
     const exportedAt = new Date("2026-06-09T12:34:56.000Z");
-    const envelope = createPlannerDataExportEnvelope(samplePlannerData, sampleMealData, exportedAt);
+    const envelope = createPlannerDataExportEnvelope(samplePlannerData, sampleMealData, sampleWorkTrackerData, exportedAt);
 
     expect(envelope).toEqual({
       app: PLANNER_DATA_EXPORT_APP,
       version: PLANNER_DATA_EXPORT_VERSION,
       exportedAt: "2026-06-09T12:34:56.000Z",
       data: samplePlannerData,
-      meals: sampleMealData
+      meals: sampleMealData,
+      workTracker: sampleWorkTrackerData
     });
   });
 
   it("serializes export data as formatted json", () => {
-    const text = serializePlannerDataExport(samplePlannerData, sampleMealData, new Date("2026-06-09T12:34:56.000Z"));
+    const text = serializePlannerDataExport(
+      samplePlannerData,
+      sampleMealData,
+      sampleWorkTrackerData,
+      new Date("2026-06-09T12:34:56.000Z")
+    );
 
     expect(text).toContain("\n  \"app\": \"super-planner-9000\",");
-    expect(text).toContain("\n  \"version\": 3,");
+    expect(text).toContain("\n  \"version\": 4,");
     expect(text).toContain("\n  \"data\": {");
     expect(text).toContain("\n  \"meals\": {");
+    expect(text).toContain("\n  \"workTracker\": {");
   });
 
   it("strips non-persisted fields like history from exported planner data", () => {
@@ -68,6 +85,7 @@ describe("plannerDataIO", () => {
         }
       } as unknown as typeof samplePlannerData,
       sampleMealData,
+      sampleWorkTrackerData,
       exportedAt
     );
 
@@ -87,27 +105,29 @@ describe("plannerDataIO", () => {
       version: PLANNER_DATA_EXPORT_VERSION,
       exportedAt: "2026-06-09T12:34:56.000Z",
       data: samplePlannerData,
-      meals: sampleMealData
+      meals: sampleMealData,
+      workTracker: sampleWorkTrackerData
     });
 
     const result = parsePlannerDataImport(payload);
 
-    expect(result).toEqual({ ok: true, data: samplePlannerData, meals: sampleMealData });
+    expect(result).toEqual({ ok: true, data: samplePlannerData, meals: sampleMealData, workTracker: sampleWorkTrackerData });
   });
 
-  it("parses a valid payload with empty meals", () => {
+  it("parses a valid payload with empty meals and work tracker data", () => {
     const emptyMeals = { components: [], meals: [] };
     const payload = JSON.stringify({
       app: PLANNER_DATA_EXPORT_APP,
       version: PLANNER_DATA_EXPORT_VERSION,
       exportedAt: "2026-06-09T12:34:56.000Z",
       data: samplePlannerData,
-      meals: emptyMeals
+      meals: emptyMeals,
+      workTracker: emptyWorkTrackerData
     });
 
     const result = parsePlannerDataImport(payload);
 
-    expect(result).toEqual({ ok: true, data: samplePlannerData, meals: emptyMeals });
+    expect(result).toEqual({ ok: true, data: samplePlannerData, meals: emptyMeals, workTracker: emptyWorkTrackerData });
   });
 
   it("rejects unsupported versions before validating the payload", () => {
@@ -117,7 +137,8 @@ describe("plannerDataIO", () => {
         version: 999,
         exportedAt: "2026-06-09T12:34:56.000Z",
         data: { categories: [], segmentsByDate: { broken: [{ bad: true }] } },
-        meals: { components: [], meals: [] }
+        meals: { components: [], meals: [] },
+        workTracker: emptyWorkTrackerData
       })
     );
 
@@ -131,7 +152,8 @@ describe("plannerDataIO", () => {
         version: PLANNER_DATA_EXPORT_VERSION,
         exportedAt: "2026-06-09T12:34:56.000Z",
         data: { categories: [], segmentsByDate: { broken: [{ bad: true }] } },
-        meals: { components: [], meals: [] }
+        meals: { components: [], meals: [] },
+        workTracker: emptyWorkTrackerData
       })
     );
 
@@ -145,7 +167,8 @@ describe("plannerDataIO", () => {
         version: PLANNER_DATA_EXPORT_VERSION,
         exportedAt: "2026-06-09T12:34:56.000Z",
         data: { categories: [], segmentsByDate: {} },
-        meals: { components: [{ bad: true }], meals: [] }
+        meals: { components: [{ bad: true }], meals: [] },
+        workTracker: emptyWorkTrackerData
       })
     );
 
@@ -158,11 +181,84 @@ describe("plannerDataIO", () => {
         app: PLANNER_DATA_EXPORT_APP,
         version: PLANNER_DATA_EXPORT_VERSION,
         exportedAt: "2026-06-09T12:34:56.000Z",
-        data: { categories: [], segmentsByDate: {} }
+        data: { categories: [], segmentsByDate: {} },
+        workTracker: emptyWorkTrackerData
       })
     );
 
     expect(result).toEqual({ ok: false, error: "Import file does not contain valid meal data." });
+  });
+
+  it("rejects malformed work tracker data after meal data validates", () => {
+    const result = parsePlannerDataImport(
+      JSON.stringify({
+        app: PLANNER_DATA_EXPORT_APP,
+        version: PLANNER_DATA_EXPORT_VERSION,
+        exportedAt: "2026-06-09T12:34:56.000Z",
+        data: { categories: [], segmentsByDate: {} },
+        meals: { components: [], meals: [] },
+        workTracker: { clients: [], projects: [{ bad: true }], entriesByDate: {} }
+      })
+    );
+
+    expect(result).toEqual({ ok: false, error: "Import file does not contain valid work tracker data." });
+  });
+
+  it("rejects a project missing a clientId", () => {
+    const result = parsePlannerDataImport(
+      JSON.stringify({
+        app: PLANNER_DATA_EXPORT_APP,
+        version: PLANNER_DATA_EXPORT_VERSION,
+        exportedAt: "2026-06-09T12:34:56.000Z",
+        data: { categories: [], segmentsByDate: {} },
+        meals: { components: [], meals: [] },
+        workTracker: {
+          clients: [],
+          projects: [{ id: "project-1", name: "Website", color: "#E69F00" }],
+          entriesByDate: {}
+        }
+      })
+    );
+
+    expect(result).toEqual({ ok: false, error: "Import file does not contain valid work tracker data." });
+  });
+
+  it("rejects an entry with negative hours", () => {
+    const result = parsePlannerDataImport(
+      JSON.stringify({
+        app: PLANNER_DATA_EXPORT_APP,
+        version: PLANNER_DATA_EXPORT_VERSION,
+        exportedAt: "2026-06-09T12:34:56.000Z",
+        data: { categories: [], segmentsByDate: {} },
+        meals: { components: [], meals: [] },
+        workTracker: {
+          clients: [],
+          projects: [],
+          entriesByDate: { "2026-06-09": [{ id: "entry-1", projectId: "project-1", hours: -1 }] }
+        }
+      })
+    );
+
+    expect(result).toEqual({ ok: false, error: "Import file does not contain valid work tracker data." });
+  });
+
+  it("imports succeed even when an entry's projectId has no matching project", () => {
+    const payload = JSON.stringify({
+      app: PLANNER_DATA_EXPORT_APP,
+      version: PLANNER_DATA_EXPORT_VERSION,
+      exportedAt: "2026-06-09T12:34:56.000Z",
+      data: { categories: [], segmentsByDate: {} },
+      meals: { components: [], meals: [] },
+      workTracker: {
+        clients: [],
+        projects: [],
+        entriesByDate: { "2026-06-09": [{ id: "entry-1", projectId: "missing-project", hours: 4 }] }
+      }
+    });
+
+    const result = parsePlannerDataImport(payload);
+
+    expect(result.ok).toBe(true);
   });
 
   it("rejects invalid json", () => {
@@ -184,6 +280,7 @@ describe("plannerDataIO", () => {
     const envelope = createPlannerDataExportEnvelope(
       plannerDataWithMeals,
       sampleMealData,
+      emptyWorkTrackerData,
       new Date("2026-06-09T12:34:56.000Z")
     );
 
@@ -193,7 +290,7 @@ describe("plannerDataIO", () => {
 
     const result = parsePlannerDataImport(JSON.stringify(envelope));
 
-    expect(result).toEqual({ ok: true, data: envelope.data, meals: sampleMealData });
+    expect(result).toEqual({ ok: true, data: envelope.data, meals: sampleMealData, workTracker: emptyWorkTrackerData });
   });
 
   it("omits empty assignedMealIds from normalized export", () => {
@@ -209,6 +306,7 @@ describe("plannerDataIO", () => {
     const envelope = createPlannerDataExportEnvelope(
       plannerDataWithEmptyAssignment,
       sampleMealData,
+      emptyWorkTrackerData,
       new Date("2026-06-09T12:34:56.000Z")
     );
 
@@ -226,6 +324,7 @@ describe("plannerDataIO", () => {
     const envelope = createPlannerDataExportEnvelope(
       plannerDataWithDescription,
       sampleMealData,
+      emptyWorkTrackerData,
       new Date("2026-06-09T12:34:56.000Z")
     );
 
@@ -250,7 +349,8 @@ describe("plannerDataIO", () => {
             "2026-06-09": [{ id: "segment-1", categoryId: "work", startSlot: 0, endSlot: 4 }]
           }
         },
-        meals: { components: [], meals: [] }
+        meals: { components: [], meals: [] },
+        workTracker: emptyWorkTrackerData
       })
     );
 
@@ -269,7 +369,8 @@ describe("plannerDataIO", () => {
             "2026-06-09": [{ id: "segment-1", categoryId: "work", startSlot: 0, endSlot: 4, description: 42 }]
           }
         },
-        meals: { components: [], meals: [] }
+        meals: { components: [], meals: [] },
+        workTracker: emptyWorkTrackerData
       })
     );
 
@@ -288,7 +389,8 @@ describe("plannerDataIO", () => {
             "2026-06-09": [{ id: "segment-1", categoryId: "eat", startSlot: 0, endSlot: 4, assignedMealIds: [42] }]
           }
         },
-        meals: { components: [], meals: [] }
+        meals: { components: [], meals: [] },
+        workTracker: emptyWorkTrackerData
       })
     );
 

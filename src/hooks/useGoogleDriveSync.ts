@@ -7,6 +7,7 @@ import { useMealStore } from "../store/mealStore";
 import { usePlannerStore } from "../store/plannerStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useToastStore } from "../store/toastStore";
+import { useWorkTrackerStore } from "../store/workTrackerStore";
 
 export type UseGoogleDriveSyncResult = {
   isConnected: boolean;
@@ -58,9 +59,15 @@ export function useGoogleDriveSync(): UseGoogleDriveSyncResult {
 
     const plannerState = usePlannerStore.getState();
     const mealState = useMealStore.getState();
+    const workTrackerState = useWorkTrackerStore.getState();
     const exportedJson = serializePlannerDataExport(
       { categories: plannerState.categories, segmentsByDate: plannerState.segmentsByDate },
-      { components: mealState.components, meals: mealState.meals }
+      { components: mealState.components, meals: mealState.meals },
+      {
+        clients: workTrackerState.clients,
+        projects: workTrackerState.projects,
+        entriesByDate: workTrackerState.entriesByDate
+      }
     );
 
     withGoogleCalendarAuth((accessToken) => uploadPlannerDataBackup(accessToken, exportedJson))
@@ -113,6 +120,7 @@ export function useGoogleDriveSync(): UseGoogleDriveSyncResult {
 
         usePlannerStore.getState().replacePlannerData(parsed.data);
         useMealStore.getState().replaceMealData(parsed.meals);
+        useWorkTrackerStore.getState().replaceWorkTrackerData(parsed.workTracker);
         setLastDownloadedAt(new Date().toISOString());
         showToast({
           title: "Downloaded from Drive",

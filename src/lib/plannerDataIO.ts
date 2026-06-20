@@ -1,9 +1,16 @@
 import { TOTAL_DAY_SLOTS } from "./timeline";
 import type { PlannerCategory, PlannerPersistedData, PlannerSegment, PlannerSegmentsByDate } from "../store/plannerStore";
 import type { Meal, MealComponent, MealIngredient, MealPersistedData } from "../store/mealStore.types";
+import type {
+  WorkClient,
+  WorkEntriesByDate,
+  WorkEntry,
+  WorkProject,
+  WorkTrackerPersistedData
+} from "../store/workTrackerStore.types";
 
 export const PLANNER_DATA_EXPORT_APP = "super-planner-9000" as const;
-export const PLANNER_DATA_EXPORT_VERSION = 3 as const;
+export const PLANNER_DATA_EXPORT_VERSION = 4 as const;
 
 export type PlannerDataExportEnvelope = {
   app: typeof PLANNER_DATA_EXPORT_APP;
@@ -11,10 +18,11 @@ export type PlannerDataExportEnvelope = {
   exportedAt: string;
   data: PlannerPersistedData;
   meals: MealPersistedData;
+  workTracker: WorkTrackerPersistedData;
 };
 
 export type PlannerDataImportResult =
-  | { ok: true; data: PlannerPersistedData; meals: MealPersistedData }
+  | { ok: true; data: PlannerPersistedData; meals: MealPersistedData; workTracker: WorkTrackerPersistedData }
   | { ok: false; error: string };
 
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -176,6 +184,83 @@ function isMealPersistedData(value: unknown): value is MealPersistedData {
 }
 
 /**
+ * Validates a single work client shape.
+ *
+ * @param value - Unknown candidate client.
+ * @returns Whether the value matches WorkClient fields.
+ */
+function isWorkClient(value: unknown): value is WorkClient {
+  return isPlainObject(value) && isString(value.id) && isString(value.name);
+}
+
+/**
+ * Validates a single work project shape, including its required client reference field.
+ *
+ * @param value - Unknown candidate project.
+ * @returns Whether the value matches WorkProject fields.
+ */
+function isWorkProject(value: unknown): value is WorkProject {
+  return (
+    isPlainObject(value) &&
+    isString(value.id) &&
+    isString(value.name) &&
+    isString(value.color) &&
+    isString(value.clientId)
+  );
+}
+
+/**
+ * Validates a single work entry shape.
+ *
+ * @param value - Unknown candidate entry.
+ * @returns Whether the value matches WorkEntry fields.
+ */
+function isWorkEntry(value: unknown): value is WorkEntry {
+  return (
+    isPlainObject(value) &&
+    isString(value.id) &&
+    isString(value.projectId) &&
+    isNumber(value.hours) &&
+    value.hours >= 0
+  );
+}
+
+/**
+ * Validates per-date work entry map shape for import payloads.
+ *
+ * @param value - Unknown candidate date map.
+ * @returns Whether each key is a date and each value is a valid entry array.
+ */
+function isWorkEntriesByDate(value: unknown): value is WorkEntriesByDate {
+  if (!isPlainObject(value)) {
+    return false;
+  }
+
+  return Object.entries(value).every(([dateKey, entries]) => {
+    return DATE_KEY_PATTERN.test(dateKey) && Array.isArray(entries) && entries.every((entry) => isWorkEntry(entry));
+  });
+}
+
+/**
+ * Validates the persisted work tracker payload shape. Does not check that a project's clientId
+ * or an entry's projectId resolves to an existing record, matching the same referential leniency
+ * already used for segment categoryId and meal ingredient componentId references.
+ *
+ * @param value - Unknown candidate persisted payload.
+ * @returns Whether clients, projects, and per-date entries are valid.
+ */
+function isWorkTrackerPersistedData(value: unknown): value is WorkTrackerPersistedData {
+  return (
+    isPlainObject(value) &&
+    Array.isArray(value.clients) &&
+    value.clients.every((client) => isWorkClient(client)) &&
+    Array.isArray(value.projects) &&
+    value.projects.every((project) => isWorkProject(project)) &&
+    isWorkEntriesByDate(value.entriesByDate)
+  );
+}
+
+/**
  * Produces a deep-cloned, JSON-safe persisted planner payload.
  *
  * @param data - Persisted planner data to normalize.
@@ -232,11 +317,36 @@ function normalizeMealPersistedData(meals: MealPersistedData): MealPersistedData
 }
 
 /**
- * Creates a versioned export envelope for the current planner and meal data.
+ * Produces a deep-cloned, JSON-safe persisted work tracker payload.
+ *
+ * @param workTracker - Persisted work tracker data to normalize.
+ * @returns Cloned payload suitable for export.
+ */
+function normalizeWorkTrackerPersistedData(workTracker: WorkTrackerPersistedData): WorkTrackerPersistedData {
+  return {
+    clients: workTracker.clients.map((client) => ({ id: client.id, name: client.name })),
+    projects: workTracker.projects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      color: project.color,
+      clientId: project.clientId
+    })),
+    entriesByDate: Object.fromEntries(
+      Object.entries(workTracker.entriesByDate).map(([dateKey, entries]) => [
+        dateKey,
+        entries.map((entry) => ({ id: entry.id, projectId: entry.projectId, hours: entry.hours }))
+      ])
+    )
+  };
+}
+
+/**
+ * Creates a versioned export envelope for the current planner, meal, and work tracker data.
  */
 export function createPlannerDataExportEnvelope(
   plannerData: PlannerPersistedData,
   mealData: MealPersistedData,
+  workTrackerData: WorkTrackerPersistedData,
   exportedAt: Date = new Date()
 ): PlannerDataExportEnvelope {
   return {
@@ -244,19 +354,21 @@ export function createPlannerDataExportEnvelope(
     version: PLANNER_DATA_EXPORT_VERSION,
     exportedAt: exportedAt.toISOString(),
     data: normalizePlannerPersistedData(plannerData),
-    meals: normalizeMealPersistedData(mealData)
+    meals: normalizeMealPersistedData(mealData),
+    workTracker: normalizeWorkTrackerPersistedData(workTrackerData)
   };
 }
 
 /**
- * Serializes planner and meal data into a formatted JSON export string.
+ * Serializes planner, meal, and work tracker data into a formatted JSON export string.
  */
 export function serializePlannerDataExport(
   plannerData: PlannerPersistedData,
   mealData: MealPersistedData,
+  workTrackerData: WorkTrackerPersistedData,
   exportedAt: Date = new Date()
 ): string {
-  return JSON.stringify(createPlannerDataExportEnvelope(plannerData, mealData, exportedAt), null, 2);
+  return JSON.stringify(createPlannerDataExportEnvelope(plannerData, mealData, workTrackerData, exportedAt), null, 2);
 }
 
 /**
@@ -303,5 +415,9 @@ export function parsePlannerDataImport(text: string): PlannerDataImportResult {
     return { ok: false, error: "Import file does not contain valid meal data." };
   }
 
-  return { ok: true, data: parsed.data, meals: parsed.meals };
+  if (!isWorkTrackerPersistedData(parsed.workTracker)) {
+    return { ok: false, error: "Import file does not contain valid work tracker data." };
+  }
+
+  return { ok: true, data: parsed.data, meals: parsed.meals, workTracker: parsed.workTracker };
 }
