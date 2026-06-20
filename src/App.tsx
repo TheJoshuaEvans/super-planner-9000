@@ -11,6 +11,7 @@ import ShoppingListPanel from "./components/ShoppingListPanel/ShoppingListPanel"
 import ToastViewport from "./components/ToastViewport/ToastViewport";
 import TimelineTrack from "./components/TimelineTrack/TimelineTrack";
 import type { CrossDragPreview } from "./components/TimelineTrack/timelineTrackInteractions";
+import WorkTracker from "./components/WorkTracker/WorkTracker";
 import { useGoogleCalendarTokenExpiry } from "./hooks/useGoogleCalendarTokenExpiry";
 import { useGoogleDriveAutoUpload } from "./hooks/useGoogleDriveAutoUpload";
 import { usePlannerUndoRedoHotkeys } from "./hooks/usePlannerUndoRedoHotkeys";
@@ -19,6 +20,7 @@ import {
   ACTIVE_TAB_LOCAL_STORAGE_KEY,
   APP_TABS,
   getAppTabDefinition,
+  getAppTabsByGroup,
   isAppTab
 } from "./lib/appTabs";
 import type { AppTab, AppTabDefinition } from "./lib/appTabs";
@@ -42,19 +44,19 @@ import { useEffect, useRef, useState, type ChangeEvent, type ReactElement } from
 import { useToastStore } from "./store/toastStore";
 import type { PlannerDateKey, PlannerSegment } from "./store/plannerStore";
 
-/** Identifies the "Eat" segment currently selected for meal assignment. */
-type SelectedEatSegment = {
+/** Identifies the segment currently open in the editor dock. */
+type SelectedSegment = {
   dateKey: PlannerDateKey;
   segmentId: string;
 };
 
 const PORTRAIT_WARNING_SESSION_KEY = "sp9000-portrait-warning-dismissed";
 
-/** The Dashboard tab, rendered as its own floating pill set apart from the other tabs. */
-const DASHBOARD_TAB = APP_TABS[0];
+/** Tabs rendered in the primary (left) tab pill bubble, e.g. Dashboard and Work Tracker. */
+const PRIMARY_TABS = getAppTabsByGroup("primary");
 
-/** All tabs other than Dashboard, rendered together in the main tab pill. */
-const OTHER_TABS = APP_TABS.slice(1);
+/** Tabs rendered in the secondary (right) tab pill bubble. */
+const SECONDARY_TABS = getAppTabsByGroup("secondary");
 
 /**
  * Composes the planner page shell from the timeline track and category palette.
@@ -70,6 +72,7 @@ function App() {
   const deleteSegmentForDate = usePlannerStore((state) => state.deleteSegmentForDate);
   const clearSegmentsForDate = usePlannerStore((state) => state.clearSegmentsForDate);
   const setSegmentAssignedMealsForDate = usePlannerStore((state) => state.setSegmentAssignedMealsForDate);
+  const setSegmentDescriptionForDate = usePlannerStore((state) => state.setSegmentDescriptionForDate);
   const pasteSegmentsForDate = usePlannerStore((state) => state.pasteSegmentsForDate);
   const meals = useMealStore((state) => state.meals);
   const canUndoPlannerEdit = usePlannerStore((state) => state.canUndo);
@@ -98,7 +101,7 @@ function App() {
   const [selectedDateKey, setSelectedDateKey] = useState<PlannerDateKey | null>(null);
   const [crossDragPreview, setCrossDragPreview] = useState<CrossDragPreview | null>(null);
   const trackElementsByDateKeyRef = useRef<Map<PlannerDateKey, HTMLDivElement>>(new Map());
-  const [selectedEatSegment, setSelectedEatSegment] = useState<SelectedEatSegment | null>(null);
+  const [selectedSegment, setSelectedSegment] = useState<SelectedSegment | null>(null);
   const [pendingMealIds, setPendingMealIds] = useState<string[]>([]);
   const [isPortraitWarningDismissed, setIsPortraitWarningDismissed] = useState<boolean>(() => {
     if (typeof window === "undefined") {
@@ -108,6 +111,7 @@ function App() {
     return window.sessionStorage.getItem(PORTRAIT_WARNING_SESSION_KEY) === "true";
   });
   const canPasteTimeline = copiedTimelineSegments !== null;
+
   const selectedDateSegments = selectedDateKey ? (segmentsByDate[selectedDateKey] ?? []) : [];
   const selectedDateTitle = selectedDateKey ? formatCalendarDateLabel(selectedDateKey) : "";
   const activeTabDefinition = getAppTabDefinition(activeTab);
@@ -186,7 +190,7 @@ function App() {
       setCopiedTimelineSegments(null);
       setCopiedTimelineSourceDateKey(null);
       setDraggingCategoryId(null);
-      setSelectedEatSegment(null);
+      setSelectedSegment(null);
       setPendingMealIds([]);
       showToast({
         title: "Planner imported",
@@ -320,11 +324,11 @@ function App() {
   }
 
   /**
-   * Switches the active tab, closing the meal assignment dock if it is open.
+   * Switches the active tab, closing the segment editor dock if it is open.
    */
   function handleSelectTab(tab: AppTab): void {
     setActiveTab(tab);
-    setSelectedEatSegment(null);
+    setSelectedSegment(null);
     setPendingMealIds([]);
   }
 
@@ -358,11 +362,11 @@ function App() {
   }
 
   /**
-   * Opens the meal assignment dock for the clicked Eat segment, seeded with its current assignments.
+   * Opens the segment editor dock for any clicked block, seeding pending meals for Eat segments.
    */
-  function handleMealEatSegmentClick(dateKey: PlannerDateKey, segment: PlannerSegment): void {
-    setSelectedEatSegment({ dateKey, segmentId: segment.id });
-    setPendingMealIds(segment.assignedMealIds ?? []);
+  function handleSegmentClick(dateKey: PlannerDateKey, segment: PlannerSegment): void {
+    setSelectedSegment({ dateKey, segmentId: segment.id });
+    setPendingMealIds(segment.categoryId === "eat" ? (segment.assignedMealIds ?? []) : []);
   }
 
   /**
@@ -373,10 +377,10 @@ function App() {
   }
 
   /**
-   * Closes the meal assignment dock without saving changes.
+   * Closes the segment editor dock without saving meal changes.
    */
-  function handleCloseMealAssignment(): void {
-    setSelectedEatSegment(null);
+  function handleCloseSegmentEditor(): void {
+    setSelectedSegment(null);
     setPendingMealIds([]);
   }
 
@@ -384,11 +388,11 @@ function App() {
    * Saves the pending meal selection to the selected Eat segment and closes the dock.
    */
   function handleSubmitMealAssignment(): void {
-    if (!selectedEatSegment) {
+    if (!selectedSegment) {
       return;
     }
 
-    setSegmentAssignedMealsForDate(selectedEatSegment.dateKey, selectedEatSegment.segmentId, pendingMealIds);
+    setSegmentAssignedMealsForDate(selectedSegment.dateKey, selectedSegment.segmentId, pendingMealIds);
 
     showToast({
       title: "Meals assigned",
@@ -399,8 +403,19 @@ function App() {
       level: "success"
     });
 
-    setSelectedEatSegment(null);
+    setSelectedSegment(null);
     setPendingMealIds([]);
+  }
+
+  /**
+   * Persists the description entered in the segment editor dock to the store.
+   */
+  function handleDescriptionChange(description: string): void {
+    if (!selectedSegment) {
+      return;
+    }
+
+    setSegmentDescriptionForDate(selectedSegment.dateKey, selectedSegment.segmentId, description);
   }
 
   return (
@@ -408,7 +423,7 @@ function App() {
       <ToastViewport />
       <ConfirmDialog />
       <main
-        className={`min-h-screen bg-app-bg px-4 py-5 text-app-text lg:px-6 lg:py-6 ${selectedDateKey || selectedEatSegment ? "pb-[37rem] lg:pb-[39rem]" : "pb-32 lg:pb-36"} ${draggingCategoryId ? "cursor-grabbing" : ""}`}
+        className={`min-h-screen bg-app-bg px-4 py-5 text-app-text lg:px-6 lg:py-6 ${selectedDateKey || selectedSegment ? "pb-[37rem] lg:pb-[39rem]" : "pb-32 lg:pb-36"} ${draggingCategoryId ? "cursor-grabbing" : ""}`}
         onPointerUp={isDashboardTab ? () => setDraggingCategoryId(null) : undefined}
       >
         <div className="mx-auto flex w-full max-w-[96rem] justify-center pb-3">
@@ -428,11 +443,11 @@ function App() {
             <div className="flex flex-col items-start gap-3 lg:items-end">
               <div className="flex items-center gap-2" role="group" aria-label="App tabs">
                 <div className="inline-flex rounded-lg border border-app-border bg-app-surface/90 p-1 shadow-sm">
-                  {renderTabButton(DASHBOARD_TAB)}
+                  {PRIMARY_TABS.map(renderTabButton)}
                 </div>
 
                 <div className="inline-flex rounded-lg border border-app-border bg-app-surface/90 p-1 shadow-sm">
-                  {OTHER_TABS.map(renderTabButton)}
+                  {SECONDARY_TABS.map(renderTabButton)}
                 </div>
               </div>
 
@@ -477,16 +492,17 @@ function App() {
                       handleDropCategory(dateKey, categoryId, startSlot, endSlot)
                     }
                     onDeleteSegment={(segmentId) => deleteSegmentForDate(dateKey, segmentId)}
-                    onEatSegmentClick={(segment) => handleMealEatSegmentClick(dateKey, segment)}
-                    selectedEatSegmentId={
-                      selectedEatSegment?.dateKey === dateKey && dateKey !== selectedDateKey
-                        ? selectedEatSegment.segmentId
+                    onSegmentClick={(segment) => handleSegmentClick(dateKey, segment)}
+                    selectedSegmentId={
+                      selectedSegment?.dateKey === dateKey && dateKey !== selectedDateKey
+                        ? selectedSegment.segmentId
                         : null
                     }
                     pendingMealIds={pendingMealIds}
                     onToggleAssignedMeal={handleToggleAssignedMeal}
                     onSubmitMealAssignment={handleSubmitMealAssignment}
-                    onCloseMealAssignment={handleCloseMealAssignment}
+                    onCloseSegmentEditor={handleCloseSegmentEditor}
+                    onDescriptionChange={handleDescriptionChange}
                     trackElementsByDateKey={trackElementsByDateKeyRef}
                     registerTrackElement={(element) => handleRegisterTrackElement(dateKey, element)}
                     crossDragPreview={crossDragPreview?.targetDateKey === dateKey ? crossDragPreview : null}
@@ -509,6 +525,8 @@ function App() {
 
               <ShoppingListPanel defaultEndDateOffsetDays={6} />
             </section>
+          ) : activeTabDefinition.contentKind === "work-tracker" ? (
+            <WorkTracker />
           ) : activeTabDefinition.contentKind === "meal-creator" ? (
             <section className="flex flex-1 flex-col gap-5">
               <MealCreator />
@@ -564,14 +582,15 @@ function App() {
                       handleDropCategory(selectedDateKey, categoryId, startSlot, endSlot)
                     }
                     onDeleteSegment={(segmentId) => deleteSegmentForDate(selectedDateKey, segmentId)}
-                    onEatSegmentClick={(segment) => handleMealEatSegmentClick(selectedDateKey, segment)}
-                    selectedEatSegmentId={
-                      selectedEatSegment?.dateKey === selectedDateKey ? selectedEatSegment.segmentId : null
+                    onSegmentClick={(segment) => handleSegmentClick(selectedDateKey, segment)}
+                    selectedSegmentId={
+                      selectedSegment?.dateKey === selectedDateKey ? selectedSegment.segmentId : null
                     }
                     pendingMealIds={pendingMealIds}
                     onToggleAssignedMeal={handleToggleAssignedMeal}
                     onSubmitMealAssignment={handleSubmitMealAssignment}
-                    onCloseMealAssignment={handleCloseMealAssignment}
+                    onCloseSegmentEditor={handleCloseSegmentEditor}
+                    onDescriptionChange={handleDescriptionChange}
                   />
                 </div>
               ) : null}

@@ -350,4 +350,35 @@ describe("plannerStore", () => {
     expect(state.categories).toEqual([{ id: "custom", label: "Custom", color: "#111111" }]);
     expect(state.segmentsByDate[DATE_B]).toHaveLength(1);
   });
+
+  it("sets a description on a segment", () => {
+    usePlannerStore.getState().addCategoryForDate(DATE_A, "work", 4, 8);
+
+    const segmentId = usePlannerStore.getState().segmentsByDate[DATE_A][0].id;
+
+    usePlannerStore.getState().setSegmentDescriptionForDate(DATE_A, segmentId, "Focus time");
+
+    expect(usePlannerStore.getState().segmentsByDate[DATE_A][0].description).toBe("Focus time");
+  });
+
+  it("clears a segment description when passed an empty string", () => {
+    usePlannerStore.getState().addCategoryForDate(DATE_A, "work", 4, 8);
+
+    const segmentId = usePlannerStore.getState().segmentsByDate[DATE_A][0].id;
+
+    usePlannerStore.getState().setSegmentDescriptionForDate(DATE_A, segmentId, "Focus time");
+    usePlannerStore.getState().setSegmentDescriptionForDate(DATE_A, segmentId, "");
+
+    expect(usePlannerStore.getState().segmentsByDate[DATE_A][0].description).toBeUndefined();
+  });
+
+  it("trims whitespace when setting a segment description", () => {
+    usePlannerStore.getState().addCategoryForDate(DATE_A, "work", 4, 8);
+
+    const segmentId = usePlannerStore.getState().segmentsByDate[DATE_A][0].id;
+
+    usePlannerStore.getState().setSegmentDescriptionForDate(DATE_A, segmentId, "  Focus time  ");
+
+    expect(usePlannerStore.getState().segmentsByDate[DATE_A][0].description).toBe("Focus time");
+  });
 });

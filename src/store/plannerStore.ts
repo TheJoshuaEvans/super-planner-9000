@@ -132,6 +132,17 @@ export const usePlannerStore = create<PlannerStore>()(
             )
           })
         ),
+      setSegmentDescriptionForDate: (dateKey, segmentId, description) =>
+        set((state) =>
+          applyTimelineEdit(state, {
+            ...state.segmentsByDate,
+            [dateKey]: segmentsForDate(state, dateKey).map((segment) =>
+              segment.id === segmentId
+                ? { ...segment, description: description.trim() || undefined }
+                : segment
+            )
+          })
+        ),
       pasteSegmentsForDate: (dateKey, copiedSegments) =>
         set((state) =>
           applyTimelineEdit(state, {

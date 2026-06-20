@@ -19,6 +19,8 @@ export type PlannerSegment = {
   endSlot: number;
   /** Ids of meals assigned to this segment (used for "Eat" category segments). */
   assignedMealIds?: string[];
+  /** Optional free-text note displayed on and below the block. */
+  description?: string;
 };
 
 /** Calendar identity string in YYYY-MM-DD format. */
@@ -92,6 +94,12 @@ export type PlannerStore = PlannerState & {
    * Sets the list of meal ids assigned to a segment on the given date.
    */
   setSegmentAssignedMealsForDate: (dateKey: PlannerDateKey, segmentId: string, mealIds: string[]) => void;
+
+  /**
+   * Sets the free-text description for a segment on the given date. Passing an
+   * empty string removes the description.
+   */
+  setSegmentDescriptionForDate: (dateKey: PlannerDateKey, segmentId: string, description: string) => void;
 
   /**
    * Pastes copied segments into the selected date using overwrite merge rules.

@@ -111,7 +111,8 @@ export function arePersistedDataEqual(left: PlannerPersistedData, right: Planner
         leftSegment.categoryId !== rightSegment.categoryId ||
         leftSegment.startSlot !== rightSegment.startSlot ||
         leftSegment.endSlot !== rightSegment.endSlot ||
-        !areAssignedMealIdsEqual(leftSegment.assignedMealIds, rightSegment.assignedMealIds)
+        !areAssignedMealIdsEqual(leftSegment.assignedMealIds, rightSegment.assignedMealIds) ||
+        (leftSegment.description ?? "") !== (rightSegment.description ?? "")
       ) {
         return false;
       }

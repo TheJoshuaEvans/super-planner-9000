@@ -26,7 +26,7 @@ import {
   type ResizeInteraction
 } from "./timelineTrackInteractions";
 import { getTimelineControlButtonClassName } from "../shared/timelineControlButton";
-import MealAssignmentPanel from "../MealAssignmentPanel/MealAssignmentPanel";
+import SegmentEditorPanel from "../SegmentEditorPanel/SegmentEditorPanel";
 import MiniTimeline from "../shared/MiniTimeline";
 import TimelineHourRuler from "../shared/TimelineHourRuler";
 import TimelineQuarterHourGrid from "../shared/TimelineQuarterHourGrid";
@@ -50,12 +50,13 @@ type TimelineTrackProps = {
   onPasteTimeline: () => void;
   onClearTimeline: () => void;
   onDeleteSegment: (segmentId: string) => void;
-  onEatSegmentClick?: (segment: PlannerSegment) => void;
-  selectedEatSegmentId?: string | null;
+  onSegmentClick?: (segment: PlannerSegment) => void;
+  selectedSegmentId?: string | null;
   pendingMealIds?: string[];
   onToggleAssignedMeal?: (mealId: string) => void;
   onSubmitMealAssignment?: () => void;
-  onCloseMealAssignment?: () => void;
+  onCloseSegmentEditor?: () => void;
+  onDescriptionChange?: (description: string) => void;
   footer?: ReactNode;
   showCurrentTimeMarker?: boolean;
   trackElementsByDateKey?: RefObject<Map<string, HTMLDivElement>>;
@@ -85,12 +86,13 @@ function TimelineTrack({
   onPasteTimeline,
   onClearTimeline,
   onDeleteSegment,
-  onEatSegmentClick,
-  selectedEatSegmentId = null,
+  onSegmentClick,
+  selectedSegmentId = null,
   pendingMealIds = [],
   onToggleAssignedMeal,
   onSubmitMealAssignment,
-  onCloseMealAssignment,
+  onCloseSegmentEditor,
+  onDescriptionChange,
   footer,
   showCurrentTimeMarker = false,
   trackElementsByDateKey,
@@ -152,12 +154,9 @@ function TimelineTrack({
     [segments, meals]
   );
 
-  const selectedEatSegment = useMemo(
-    () =>
-      selectedEatSegmentId
-        ? segments.find((segment) => segment.id === selectedEatSegmentId && segment.categoryId === "eat")
-        : undefined,
-    [segments, selectedEatSegmentId]
+  const selectedSegment = useMemo(
+    () => (selectedSegmentId ? segments.find((segment) => segment.id === selectedSegmentId) : undefined),
+    [segments, selectedSegmentId]
   );
 
   /**
@@ -310,8 +309,8 @@ function TimelineTrack({
         Date.now()
       );
 
-      if (segment?.categoryId === "eat" && onEatSegmentClick && isClick) {
-        onEatSegmentClick(segment);
+      if (segment && isClick && onSegmentClick) {
+        onSegmentClick(segment);
         setInteraction(null);
         setIsTrashHot(false);
         return;
@@ -478,12 +477,14 @@ function TimelineTrack({
                     const resizeHandleWidthClass = isMinimumSizeSegment ? "w-2" : "w-3";
                     const assignedMeals =
                       segment.categoryId === "eat" ? resolveAssignedMeals(meals, segment.assignedMealIds) : [];
-                    const tooltipContent =
-                      assignedMeals.length > 0
-                        ? `${segmentLabel} • ${segmentTimeRangeLabel} • ${segmentDurationLabel} • Meals: ${assignedMeals
-                            .map((meal) => meal.name)
-                            .join(", ")}`
-                        : `${segmentLabel} • ${segmentTimeRangeLabel} • ${segmentDurationLabel}`;
+                    const tooltipParts = [`${segmentLabel} • ${segmentTimeRangeLabel} • ${segmentDurationLabel}`];
+                    if (assignedMeals.length > 0) {
+                      tooltipParts.push(`Meals: ${assignedMeals.map((meal) => meal.name).join(", ")}`);
+                    }
+                    if (segment.description) {
+                      tooltipParts.push(segment.description);
+                    }
+                    const tooltipContent = tooltipParts.join(" • ");
 
                     return (
                       <Tooltip
@@ -512,6 +513,9 @@ function TimelineTrack({
                           <span className="truncate text-sm font-semibold">{segmentLabel}</span>
                           <span className="truncate text-xs text-white/85">{segmentTimeRangeLabel}</span>
                           <span className="truncate text-[11px] text-white/70">{segmentDurationLabel}</span>
+                          {segment.description ? (
+                            <span className="truncate text-[10px] italic text-white/60">{segment.description}</span>
+                          ) : null}
                         </div>
 
                         {/* Right resize handle */}
@@ -592,15 +596,19 @@ function TimelineTrack({
         </div>
       </div>
 
-      {selectedEatSegment && onToggleAssignedMeal && onSubmitMealAssignment && onCloseMealAssignment ? (
+      {selectedSegment && onCloseSegmentEditor ? (
         <div className="border-t border-app-border pt-3">
-          <MealAssignmentPanel
-            contextLabel={formatSlotRangeLabelMeridiem(selectedEatSegment.startSlot, selectedEatSegment.endSlot)}
+          <SegmentEditorPanel
+            key={selectedSegment.id}
+            contextLabel={`${categoriesById.get(selectedSegment.categoryId)?.label ?? selectedSegment.categoryId} — ${formatSlotRangeLabelMeridiem(selectedSegment.startSlot, selectedSegment.endSlot)}`}
+            description={selectedSegment.description ?? ""}
+            isEatSegment={selectedSegment.categoryId === "eat"}
             meals={meals}
             selectedMealIds={pendingMealIds}
-            onToggleMeal={onToggleAssignedMeal}
-            onSubmit={onSubmitMealAssignment}
-            onClose={onCloseMealAssignment}
+            onToggleMeal={onToggleAssignedMeal ?? (() => {})}
+            onSubmitMeals={onSubmitMealAssignment ?? (() => {})}
+            onDescriptionChange={onDescriptionChange ?? (() => {})}
+            onClose={onCloseSegmentEditor}
           />
         </div>
       ) : null}

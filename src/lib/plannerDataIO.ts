@@ -81,7 +81,8 @@ function isPlannerSegment(value: unknown): value is PlannerSegment {
     value.endSlot <= TOTAL_DAY_SLOTS &&
     value.startSlot < value.endSlot &&
     (value.assignedMealIds === undefined ||
-      (Array.isArray(value.assignedMealIds) && value.assignedMealIds.every((id) => isString(id))))
+      (Array.isArray(value.assignedMealIds) && value.assignedMealIds.every((id) => isString(id)))) &&
+    (value.description === undefined || isString(value.description))
   );
 }
 
@@ -197,7 +198,8 @@ function normalizePlannerPersistedData(data: PlannerPersistedData): PlannerPersi
           endSlot: segment.endSlot,
           ...(segment.assignedMealIds && segment.assignedMealIds.length > 0
             ? { assignedMealIds: [...segment.assignedMealIds] }
-            : {})
+            : {}),
+          ...(segment.description ? { description: segment.description } : {})
         }))
       ])
     )
