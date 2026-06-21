@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import {
   countEntriesUsingProject,
   isProjectNameTaken,
+  parseHourlyRateInput,
   pickNextProjectColor
 } from "../../lib/workTrackerData";
 import { useConfirmDialogStore } from "../../store/confirmDialogStore";
@@ -47,11 +48,13 @@ function ProjectsPanel() {
   const [formName, setFormName] = useState("");
   const [formColor, setFormColor] = useState("#000000");
   const [formClientId, setFormClientId] = useState("");
+  const [formHourlyRateText, setFormHourlyRateText] = useState("0");
   const [showQuickAddClient, setShowQuickAddClient] = useState(false);
   const [quickAddClientName, setQuickAddClientName] = useState("");
 
   const nameTaken = isProjectNameTaken(projects, formName, editingId ?? undefined);
-  const canSave = formName.trim().length > 0 && !nameTaken && formClientId.length > 0;
+  const parsedHourlyRate = parseHourlyRateInput(formHourlyRateText);
+  const canSave = formName.trim().length > 0 && !nameTaken && formClientId.length > 0 && parsedHourlyRate !== null;
 
   /**
    * Opens the add form with an empty label and a suggested unused color.
@@ -62,6 +65,7 @@ function ProjectsPanel() {
     setFormName("");
     setFormColor(pickNextProjectColor(projects));
     setFormClientId(clients[0]?.id ?? "");
+    setFormHourlyRateText("0");
     setShowQuickAddClient(false);
     setQuickAddClientName("");
   }
@@ -77,6 +81,7 @@ function ProjectsPanel() {
     setFormName(project.name);
     setFormColor(project.color);
     setFormClientId(project.clientId);
+    setFormHourlyRateText(String(project.hourlyRate ?? 0));
     setShowQuickAddClient(false);
     setQuickAddClientName("");
   }
@@ -99,11 +104,11 @@ function ProjectsPanel() {
    */
   function handleSubmit(event: FormEvent): void {
     event.preventDefault();
-    if (!canSave) return;
+    if (!canSave || parsedHourlyRate === null) return;
     if (mode === "add") {
-      addProject(formName, formColor, formClientId);
+      addProject(formName, formColor, formClientId, parsedHourlyRate);
     } else if (mode === "edit" && editingId) {
-      updateProject(editingId, formName, formColor, formClientId);
+      updateProject(editingId, formName, formColor, formClientId, parsedHourlyRate);
     }
     handleCancel();
   }
@@ -193,6 +198,25 @@ function ProjectsPanel() {
               aria-label="Project color"
               className={colorInputClassName}
             />
+            <div className="w-28 shrink-0 space-y-1">
+              <div className="flex items-center gap-1">
+                <span className="text-sm text-app-muted">$</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Rate"
+                  value={formHourlyRateText}
+                  onChange={(e) => setFormHourlyRateText(e.target.value)}
+                  aria-label="Hourly rate in dollars"
+                  className={inputClassName}
+                />
+                <span className="text-sm text-app-muted">/hr</span>
+              </div>
+              {parsedHourlyRate === null && formHourlyRateText.trim().length > 0 && (
+                <p className="text-xs text-red-400">Enter a rate of 0 or more.</p>
+              )}
+            </div>
           </div>
 
           <div className="space-y-1">
@@ -278,7 +302,9 @@ function ProjectsPanel() {
                   />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-app-text">{project.name}</p>
-                    <p className="truncate text-xs text-app-muted">{client?.name ?? "No client"}</p>
+                    <p className="truncate text-xs text-app-muted">
+                      {client?.name ?? "No client"} · ${(project.hourlyRate ?? 0).toFixed(2)}/hr
+                    </p>
                   </div>
                 </div>
                 {mode === "list" && (

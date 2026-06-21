@@ -37,7 +37,7 @@ const emptyWorkTrackerData = { clients: [], projects: [], entriesByDate: {} };
 
 const sampleWorkTrackerData = {
   clients: [{ id: "client-1", name: "Acme Co" }],
-  projects: [{ id: "project-1", name: "Website", color: "#E69F00", clientId: "client-1" }],
+  projects: [{ id: "project-1", name: "Website", color: "#E69F00", clientId: "client-1", hourlyRate: 45 }],
   entriesByDate: {
     "2026-06-09": [{ id: "entry-1", projectId: "project-1", hours: 4 }]
   }
@@ -67,7 +67,7 @@ describe("plannerDataIO", () => {
     );
 
     expect(text).toContain("\n  \"app\": \"super-planner-9000\",");
-    expect(text).toContain("\n  \"version\": 4,");
+    expect(text).toContain("\n  \"version\": 5,");
     expect(text).toContain("\n  \"data\": {");
     expect(text).toContain("\n  \"meals\": {");
     expect(text).toContain("\n  \"workTracker\": {");
@@ -214,7 +214,45 @@ describe("plannerDataIO", () => {
         meals: { components: [], meals: [] },
         workTracker: {
           clients: [],
-          projects: [{ id: "project-1", name: "Website", color: "#E69F00" }],
+          projects: [{ id: "project-1", name: "Website", color: "#E69F00", hourlyRate: 45 }],
+          entriesByDate: {}
+        }
+      })
+    );
+
+    expect(result).toEqual({ ok: false, error: "Import file does not contain valid work tracker data." });
+  });
+
+  it("rejects a project missing an hourlyRate", () => {
+    const result = parsePlannerDataImport(
+      JSON.stringify({
+        app: PLANNER_DATA_EXPORT_APP,
+        version: PLANNER_DATA_EXPORT_VERSION,
+        exportedAt: "2026-06-09T12:34:56.000Z",
+        data: { categories: [], segmentsByDate: {} },
+        meals: { components: [], meals: [] },
+        workTracker: {
+          clients: [],
+          projects: [{ id: "project-1", name: "Website", color: "#E69F00", clientId: "client-1" }],
+          entriesByDate: {}
+        }
+      })
+    );
+
+    expect(result).toEqual({ ok: false, error: "Import file does not contain valid work tracker data." });
+  });
+
+  it("rejects a project with a negative hourlyRate", () => {
+    const result = parsePlannerDataImport(
+      JSON.stringify({
+        app: PLANNER_DATA_EXPORT_APP,
+        version: PLANNER_DATA_EXPORT_VERSION,
+        exportedAt: "2026-06-09T12:34:56.000Z",
+        data: { categories: [], segmentsByDate: {} },
+        meals: { components: [], meals: [] },
+        workTracker: {
+          clients: [],
+          projects: [{ id: "project-1", name: "Website", color: "#E69F00", clientId: "client-1", hourlyRate: -5 }],
           entriesByDate: {}
         }
       })

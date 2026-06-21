@@ -9,6 +9,7 @@ import {
   createProject,
   isClientNameTaken,
   isProjectNameTaken,
+  parseHourlyRateInput,
   pickNextProjectColor,
   removeClientFromList,
   removeEntriesForProject,
@@ -25,8 +26,8 @@ function makeClient(id: string, name: string): WorkClient {
   return { id, name };
 }
 
-function makeProject(id: string, name: string, color: string, clientId: string): WorkProject {
-  return { id, name, color, clientId };
+function makeProject(id: string, name: string, color: string, clientId: string, hourlyRate = 0): WorkProject {
+  return { id, name, color, clientId, hourlyRate };
 }
 
 describe("createClient", () => {
@@ -105,11 +106,34 @@ describe("pickNextProjectColor", () => {
 
 describe("createProject", () => {
   it("trims whitespace and generates a prefixed id", () => {
-    const project = createProject("  Website  ", "#E69F00", "c1");
+    const project = createProject("  Website  ", "#E69F00", "c1", 45);
     expect(project.name).toBe("Website");
     expect(project.id).toMatch(/^project-/);
     expect(project.color).toBe("#E69F00");
     expect(project.clientId).toBe("c1");
+    expect(project.hourlyRate).toBe(45);
+  });
+});
+
+describe("parseHourlyRateInput", () => {
+  it("parses a valid non-negative number", () => {
+    expect(parseHourlyRateInput("45")).toBe(45);
+  });
+
+  it("rounds to the nearest cent", () => {
+    expect(parseHourlyRateInput("45.999")).toBe(46);
+    expect(parseHourlyRateInput("45.001")).toBe(45);
+  });
+
+  it("allows zero", () => {
+    expect(parseHourlyRateInput("0")).toBe(0);
+  });
+
+  it("returns null for empty, negative, or non-numeric input", () => {
+    expect(parseHourlyRateInput("")).toBeNull();
+    expect(parseHourlyRateInput("  ")).toBeNull();
+    expect(parseHourlyRateInput("-5")).toBeNull();
+    expect(parseHourlyRateInput("abc")).toBeNull();
   });
 });
 
@@ -129,8 +153,8 @@ describe("updateProjectInList / removeProjectFromList", () => {
   const projects = [makeProject("p1", "Website", "#000", "c1"), makeProject("p2", "App", "#111", "c1")];
 
   it("updates only the matching project", () => {
-    const updated = updateProjectInList(projects, "p1", "Website Redesign", "#222", "c2");
-    expect(updated.find((p) => p.id === "p1")).toEqual(makeProject("p1", "Website Redesign", "#222", "c2"));
+    const updated = updateProjectInList(projects, "p1", "Website Redesign", "#222", "c2", 60);
+    expect(updated.find((p) => p.id === "p1")).toEqual(makeProject("p1", "Website Redesign", "#222", "c2", 60));
     expect(updated.find((p) => p.id === "p2")).toEqual(makeProject("p2", "App", "#111", "c1"));
   });
 

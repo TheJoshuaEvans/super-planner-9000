@@ -10,7 +10,7 @@ import type {
 } from "../store/workTrackerStore.types";
 
 export const PLANNER_DATA_EXPORT_APP = "super-planner-9000" as const;
-export const PLANNER_DATA_EXPORT_VERSION = 4 as const;
+export const PLANNER_DATA_EXPORT_VERSION = 5 as const;
 
 export type PlannerDataExportEnvelope = {
   app: typeof PLANNER_DATA_EXPORT_APP;
@@ -194,7 +194,7 @@ function isWorkClient(value: unknown): value is WorkClient {
 }
 
 /**
- * Validates a single work project shape, including its required client reference field.
+ * Validates a single work project shape, including its required client reference and hourly rate.
  *
  * @param value - Unknown candidate project.
  * @returns Whether the value matches WorkProject fields.
@@ -205,7 +205,9 @@ function isWorkProject(value: unknown): value is WorkProject {
     isString(value.id) &&
     isString(value.name) &&
     isString(value.color) &&
-    isString(value.clientId)
+    isString(value.clientId) &&
+    isNumber(value.hourlyRate) &&
+    value.hourlyRate >= 0
   );
 }
 
@@ -329,7 +331,8 @@ function normalizeWorkTrackerPersistedData(workTracker: WorkTrackerPersistedData
       id: project.id,
       name: project.name,
       color: project.color,
-      clientId: project.clientId
+      clientId: project.clientId,
+      hourlyRate: project.hourlyRate ?? 0
     })),
     entriesByDate: Object.fromEntries(
       Object.entries(workTracker.entriesByDate).map(([dateKey, entries]) => [

@@ -15,6 +15,8 @@ export type WorkProject = {
   name: string;
   color: string;
   clientId: string;
+  /** Billing rate in dollars per hour, set when the project is created and editable afterward. */
+  hourlyRate: number;
 };
 
 /** Calendar identity string in YYYY-MM-DD format (matches PlannerDateKey's shape). */
@@ -54,10 +56,10 @@ export type WorkTrackerStore = WorkTrackerPersistedData & {
   /** Removes a client, cascading to remove its projects and any entries logged against them. */
   deleteClient: (id: string) => void;
 
-  /** Adds a new project to the library, scoped to a client. */
-  addProject: (name: string, color: string, clientId: string) => void;
-  /** Updates the name, color, and/or client assignment of an existing project by id. */
-  updateProject: (id: string, name: string, color: string, clientId: string) => void;
+  /** Adds a new project to the library, scoped to a client, with a billing rate in dollars/hour. */
+  addProject: (name: string, color: string, clientId: string, hourlyRate: number) => void;
+  /** Updates the name, color, client assignment, and/or hourly rate of an existing project by id. */
+  updateProject: (id: string, name: string, color: string, clientId: string, hourlyRate: number) => void;
   /** Removes a project, cascading to remove any entries logged against it across all dates. */
   deleteProject: (id: string) => void;
 

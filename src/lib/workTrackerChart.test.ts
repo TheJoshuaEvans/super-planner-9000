@@ -22,8 +22,8 @@ describe("buildMonthlyWorkChartData", () => {
       ]
     };
     const projects: WorkProject[] = [
-      { id: "proj-a", name: "A", color: "#000", clientId: "c1" },
-      { id: "proj-b", name: "B", color: "#111", clientId: "c1" }
+      { id: "proj-a", name: "A", color: "#000", clientId: "c1", hourlyRate: 0 },
+      { id: "proj-b", name: "B", color: "#111", clientId: "c1", hourlyRate: 0 }
     ];
     const points = buildMonthlyWorkChartData(new Date(2026, 5, 1), entriesByDate, projects);
 
@@ -47,7 +47,7 @@ describe("buildMonthlyWorkChartData", () => {
     const entriesByDate: WorkEntriesByDate = {
       "2026-06-01": [{ id: "e1", projectId: "proj-a", hours: 4 }]
     };
-    const projects: WorkProject[] = [{ id: "proj-a", name: "A", color: "#000", clientId: "c1" }];
+    const projects: WorkProject[] = [{ id: "proj-a", name: "A", color: "#000", clientId: "c1", hourlyRate: 0 }];
     const points = buildMonthlyWorkChartData(new Date(2026, 5, 1), entriesByDate, projects);
 
     expect(points[0]["proj-a"]).toBe(4);

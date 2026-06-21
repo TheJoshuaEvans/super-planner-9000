@@ -30,7 +30,7 @@ describe("workTrackerStore", () => {
     it("deletes a client by id, cascading to its projects and their entries", () => {
       useWorkTrackerStore.getState().addClient("Acme Co");
       const clientId = useWorkTrackerStore.getState().clients[0].id;
-      useWorkTrackerStore.getState().addProject("Website", "#E69F00", clientId);
+      useWorkTrackerStore.getState().addProject("Website", "#E69F00", clientId, 45);
       const projectId = useWorkTrackerStore.getState().projects[0].id;
       useWorkTrackerStore.getState().addEntry("2026-06-01", projectId, 4);
 
@@ -47,34 +47,35 @@ describe("workTrackerStore", () => {
     it("adds a project with a generated id", () => {
       useWorkTrackerStore.getState().addClient("Acme Co");
       const clientId = useWorkTrackerStore.getState().clients[0].id;
-      useWorkTrackerStore.getState().addProject("Website", "#E69F00", clientId);
+      useWorkTrackerStore.getState().addProject("Website", "#E69F00", clientId, 45);
 
       const { projects } = useWorkTrackerStore.getState();
       expect(projects).toHaveLength(1);
-      expect(projects[0]).toMatchObject({ name: "Website", color: "#E69F00", clientId });
+      expect(projects[0]).toMatchObject({ name: "Website", color: "#E69F00", clientId, hourlyRate: 45 });
     });
 
-    it("updates a project's name, color, and client in place", () => {
+    it("updates a project's name, color, client, and hourly rate in place", () => {
       useWorkTrackerStore.getState().addClient("Acme Co");
       useWorkTrackerStore.getState().addClient("Globex");
       const [clientA, clientB] = useWorkTrackerStore.getState().clients;
-      useWorkTrackerStore.getState().addProject("Website", "#E69F00", clientA.id);
+      useWorkTrackerStore.getState().addProject("Website", "#E69F00", clientA.id, 45);
       const projectId = useWorkTrackerStore.getState().projects[0].id;
 
-      useWorkTrackerStore.getState().updateProject(projectId, "Website Redesign", "#56B4E9", clientB.id);
+      useWorkTrackerStore.getState().updateProject(projectId, "Website Redesign", "#56B4E9", clientB.id, 60);
 
       expect(useWorkTrackerStore.getState().projects[0]).toMatchObject({
         id: projectId,
         name: "Website Redesign",
         color: "#56B4E9",
-        clientId: clientB.id
+        clientId: clientB.id,
+        hourlyRate: 60
       });
     });
 
     it("deletes a project by id, cascading to remove its entries", () => {
       useWorkTrackerStore.getState().addClient("Acme Co");
       const clientId = useWorkTrackerStore.getState().clients[0].id;
-      useWorkTrackerStore.getState().addProject("Website", "#E69F00", clientId);
+      useWorkTrackerStore.getState().addProject("Website", "#E69F00", clientId, 45);
       const projectId = useWorkTrackerStore.getState().projects[0].id;
       useWorkTrackerStore.getState().addEntry("2026-06-01", projectId, 4);
 
@@ -118,13 +119,13 @@ describe("workTrackerStore", () => {
     useWorkTrackerStore.getState().addClient("Acme Co");
     useWorkTrackerStore.getState().replaceWorkTrackerData({
       clients: [{ id: "c9", name: "Replaced Co" }],
-      projects: [{ id: "p9", name: "Replaced Project", color: "#000", clientId: "c9" }],
+      projects: [{ id: "p9", name: "Replaced Project", color: "#000", clientId: "c9", hourlyRate: 50 }],
       entriesByDate: { "2026-06-01": [{ id: "e9", projectId: "p9", hours: 2 }] }
     });
 
     const state = useWorkTrackerStore.getState();
     expect(state.clients).toEqual([{ id: "c9", name: "Replaced Co" }]);
-    expect(state.projects).toEqual([{ id: "p9", name: "Replaced Project", color: "#000", clientId: "c9" }]);
+    expect(state.projects).toEqual([{ id: "p9", name: "Replaced Project", color: "#000", clientId: "c9", hourlyRate: 50 }]);
     expect(state.entriesByDate).toEqual({ "2026-06-01": [{ id: "e9", projectId: "p9", hours: 2 }] });
   });
 

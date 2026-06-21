@@ -57,10 +57,10 @@ export const useWorkTrackerStore = create<WorkTrackerStore>()(
           };
         }),
 
-      addProject: (name, color, clientId) =>
-        set((state) => ({ projects: [...state.projects, createProject(name, color, clientId)] })),
-      updateProject: (id, name, color, clientId) =>
-        set((state) => ({ projects: updateProjectInList(state.projects, id, name, color, clientId) })),
+      addProject: (name, color, clientId, hourlyRate) =>
+        set((state) => ({ projects: [...state.projects, createProject(name, color, clientId, hourlyRate)] })),
+      updateProject: (id, name, color, clientId, hourlyRate) =>
+        set((state) => ({ projects: updateProjectInList(state.projects, id, name, color, clientId, hourlyRate) })),
       deleteProject: (id) =>
         set((state) => ({
           projects: removeProjectFromList(state.projects, id),

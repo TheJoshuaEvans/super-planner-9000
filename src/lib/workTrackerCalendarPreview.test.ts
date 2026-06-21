@@ -3,8 +3,8 @@ import { buildWorkDayPreviewBands, CALENDAR_PREVIEW_WORKDAY_MARKER_PERCENT } fro
 import type { WorkEntry, WorkProject } from "../store/workTrackerStore.types";
 
 const projects: WorkProject[] = [
-  { id: "p1", name: "A", color: "#112233", clientId: "c1" },
-  { id: "p2", name: "B", color: "#445566", clientId: "c1" }
+  { id: "p1", name: "A", color: "#112233", clientId: "c1", hourlyRate: 0 },
+  { id: "p2", name: "B", color: "#445566", clientId: "c1", hourlyRate: 0 }
 ];
 
 function makeEntry(id: string, projectId: string, hours: number): WorkEntry {

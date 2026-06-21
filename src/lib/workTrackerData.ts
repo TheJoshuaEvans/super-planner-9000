@@ -94,15 +94,38 @@ export function pickNextProjectColor(projects: WorkProject[]): string {
 }
 
 /**
+ * Parses a raw numeric hourly-rate input string into a normalized, cent-rounded value.
+ *
+ * @param raw - Raw text from a numeric hourly-rate input.
+ * @returns A non-negative number rounded to the nearest cent, or null if not a valid non-negative number.
+ */
+export function parseHourlyRateInput(raw: string): number | null {
+  const trimmed = raw.trim();
+
+  if (trimmed === "") {
+    return null;
+  }
+
+  const value = Number(trimmed);
+
+  if (!Number.isFinite(value) || value < 0) {
+    return null;
+  }
+
+  return Math.round(value * 100) / 100;
+}
+
+/**
  * Creates a new WorkProject with a generated id.
  *
  * @param name - Display name for the project.
  * @param color - Hex color used to render the project on the chart and calendar.
  * @param clientId - Id of the client this project is scoped to.
+ * @param hourlyRate - Billing rate in dollars per hour.
  * @returns A new WorkProject.
  */
-export function createProject(name: string, color: string, clientId: string): WorkProject {
-  return { id: createId("project"), name: name.trim(), color, clientId };
+export function createProject(name: string, color: string, clientId: string, hourlyRate: number): WorkProject {
+  return { id: createId("project"), name: name.trim(), color, clientId, hourlyRate };
 }
 
 /**
@@ -119,13 +142,14 @@ export function isProjectNameTaken(projects: WorkProject[], name: string, exclud
 }
 
 /**
- * Returns a new list with the target project's name, color, and client updated.
+ * Returns a new list with the target project's name, color, client, and hourly rate updated.
  *
  * @param projects - Existing project list.
  * @param id - Id of the project to update.
  * @param name - New name value.
  * @param color - New color value.
  * @param clientId - New client id value.
+ * @param hourlyRate - New billing rate in dollars per hour.
  * @returns Updated project list.
  */
 export function updateProjectInList(
@@ -133,10 +157,11 @@ export function updateProjectInList(
   id: string,
   name: string,
   color: string,
-  clientId: string
+  clientId: string,
+  hourlyRate: number
 ): WorkProject[] {
   return projects.map((project) =>
-    project.id === id ? { ...project, name: name.trim(), color, clientId } : project
+    project.id === id ? { ...project, name: name.trim(), color, clientId, hourlyRate } : project
   );
 }
 
