@@ -23,6 +23,10 @@ describe("isProtectedCategory", () => {
     expect(isProtectedCategory("eat")).toBe(true);
   });
 
+  it("protects the work category", () => {
+    expect(isProtectedCategory("work")).toBe(true);
+  });
+
   it("does not protect other categories", () => {
     expect(isProtectedCategory("sleep")).toBe(false);
     expect(isProtectedCategory("custom-123")).toBe(false);

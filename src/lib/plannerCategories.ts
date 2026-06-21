@@ -3,9 +3,10 @@ import type { PlannerCategory, PlannerSegmentsByDate } from "../store/plannerSto
 
 /**
  * Category ids that can never be removed via the Settings UI, e.g. "eat" backs the meal
- * assignment feature. Renaming and recoloring these categories is still allowed.
+ * assignment feature and "work" backs the Work Tracker assignment feature. Renaming and
+ * recoloring these categories is still allowed.
  */
-export const PROTECTED_CATEGORY_IDS: readonly string[] = ["eat"];
+export const PROTECTED_CATEGORY_IDS: readonly string[] = ["eat", "work"];
 
 /**
  * A small colorblind-safe (Okabe-Ito derived) palette suggested for newly created categories.

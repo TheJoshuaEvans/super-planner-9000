@@ -13,6 +13,7 @@ import { hasUnassignedEatSegment, resolveAssignedMeals, resolveEatSegmentsWithAs
 import { useTimelineMarkerClock } from "../../hooks/useTimelineMarkerClock";
 import type { Meal } from "../../store/mealStore.types";
 import type { PlannerCategory, PlannerSegment } from "../../store/plannerStore";
+import type { WorkProject } from "../../store/workTrackerStore";
 import {
   findCrossTrackTargetDateKey,
   isClickInteraction,
@@ -37,6 +38,10 @@ type TimelineTrackProps = {
   title?: string;
   titleSuffix?: string;
   subtitle?: string;
+  /** Custom content for the header's title slot, overriding `title`/`titleSuffix`/`subtitle`. */
+  titleContent?: ReactNode;
+  /** Drops the outer card chrome and shortens the track height, for nesting inside another card. */
+  compact?: boolean;
   categories: PlannerCategory[];
   segments: PlannerSegment[];
   meals?: Meal[];
@@ -55,6 +60,11 @@ type TimelineTrackProps = {
   pendingMealIds?: string[];
   onToggleAssignedMeal?: (mealId: string) => void;
   onSubmitMealAssignment?: () => void;
+  workProjects?: WorkProject[];
+  pendingWorkAssignment?: { projectId: string; startTime: string; endTime: string } | null;
+  onWorkProjectChange?: (projectId: string) => void;
+  onWorkRangeChange?: (startTime: string, endTime: string) => void;
+  onApplyWorkAssignment?: () => void;
   onCloseSegmentEditor?: () => void;
   onDescriptionChange?: (description: string) => void;
   footer?: ReactNode;
@@ -73,6 +83,8 @@ function TimelineTrack({
   title,
   titleSuffix,
   subtitle,
+  titleContent,
+  compact = false,
   categories,
   segments,
   meals = [],
@@ -91,6 +103,11 @@ function TimelineTrack({
   pendingMealIds = [],
   onToggleAssignedMeal,
   onSubmitMealAssignment,
+  workProjects = [],
+  pendingWorkAssignment = null,
+  onWorkProjectChange,
+  onWorkRangeChange,
+  onApplyWorkAssignment,
   onCloseSegmentEditor,
   onDescriptionChange,
   footer,
@@ -346,31 +363,39 @@ function TimelineTrack({
 
   return (
     <section
-      className={`flex flex-col gap-4 rounded-lg border p-4 transition-colors ${
-        crossDragPreview
-          ? "border-app-accent bg-app-accent/10 ring-2 ring-app-accent/60"
-          : "border-app-border bg-app-surface"
-      }`}
+      className={
+        compact
+          ? "flex flex-col gap-4"
+          : `flex flex-col gap-4 rounded-lg border p-4 transition-colors ${
+              crossDragPreview
+                ? "border-app-accent bg-app-accent/10 ring-2 ring-app-accent/60"
+                : "border-app-border bg-app-surface"
+            }`
+      }
     >
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-lg font-semibold">
-            {title ? <span>{title}</span> : null}
-            {titleSuffix ? (
-              <span
-                className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.16em] ${
-                  hasUnassignedMeals
-                    ? "border-amber-300/50 bg-amber-300/15 text-amber-200"
-                    : "border-app-accent/50 bg-app-accent/15 text-app-accent"
-                }`}
-              >
-                {titleSuffix}
-              </span>
-            ) : null}
-          </h2>
-          <p className="text-sm text-app-muted">{subtitle ?? "0-24 timeline at 15-minute resolution"}</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <div className="flex items-center gap-4">
+        {titleContent ? (
+          titleContent
+        ) : title || subtitle ? (
+          <div>
+            <h2 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-lg font-semibold">
+              {title ? <span>{title}</span> : null}
+              {titleSuffix ? (
+                <span
+                  className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.16em] ${
+                    hasUnassignedMeals
+                      ? "border-amber-300/50 bg-amber-300/15 text-amber-200"
+                      : "border-app-accent/50 bg-app-accent/15 text-app-accent"
+                  }`}
+                >
+                  {titleSuffix}
+                </span>
+              ) : null}
+            </h2>
+            <p className="text-sm text-app-muted">{subtitle ?? "0-24 timeline at 15-minute resolution"}</p>
+          </div>
+        ) : null}
+        <div className="ml-auto flex items-center gap-2">
           <button
             type="button"
             className={getTimelineControlButtonClassName(true)}
@@ -426,7 +451,7 @@ function TimelineTrack({
           <TimelineHourRuler />
 
           <div className="relative rounded-lg border border-app-border bg-app-panel">
-            <div className="relative h-[6.5rem]">
+            <div className={`relative ${compact ? "h-24" : "h-[6.5rem]"}`}>
               <TimelineQuarterHourGrid />
 
               <div className="absolute inset-x-0 top-3 bottom-1.5 px-3">
@@ -607,6 +632,14 @@ function TimelineTrack({
             selectedMealIds={pendingMealIds}
             onToggleMeal={onToggleAssignedMeal ?? (() => {})}
             onSubmitMeals={onSubmitMealAssignment ?? (() => {})}
+            isWorkSegment={selectedSegment.categoryId === "work"}
+            workProjects={workProjects}
+            workProjectId={pendingWorkAssignment?.projectId ?? ""}
+            workStartTime={pendingWorkAssignment?.startTime ?? ""}
+            workEndTime={pendingWorkAssignment?.endTime ?? ""}
+            onWorkProjectChange={onWorkProjectChange ?? (() => {})}
+            onWorkRangeChange={onWorkRangeChange ?? (() => {})}
+            onApplyWorkAssignment={onApplyWorkAssignment ?? (() => {})}
             onDescriptionChange={onDescriptionChange ?? (() => {})}
             onClose={onCloseSegmentEditor}
           />

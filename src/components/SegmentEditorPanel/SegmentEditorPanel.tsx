@@ -1,5 +1,11 @@
 import { useMemo, useState } from "react";
+import TimeRangeSlider from "../TimeRangeSlider/TimeRangeSlider";
+import { parseTimeRangeToHours } from "../../lib/workHours";
 import type { Meal } from "../../store/mealStore";
+import type { WorkProject } from "../../store/workTrackerStore";
+
+const compactSelectClassName =
+  "w-36 shrink-0 rounded-md border border-app-border bg-app-bg px-2 py-1.5 text-xs text-app-text focus:border-app-accent/60 focus:outline-none focus:ring-2 focus:ring-app-accent/20";
 
 type SegmentEditorPanelProps = {
   /** e.g. "Eat — 2:00 PM - 3:00 PM" */
@@ -12,14 +18,23 @@ type SegmentEditorPanelProps = {
   selectedMealIds: string[];
   onToggleMeal: (mealId: string) => void;
   onSubmitMeals: () => void;
+  /** Whether to render the Work Tracker assignment section below the description. */
+  isWorkSegment: boolean;
+  workProjects: WorkProject[];
+  workProjectId: string;
+  workStartTime: string;
+  workEndTime: string;
+  onWorkProjectChange: (projectId: string) => void;
+  onWorkRangeChange: (startTime: string, endTime: string) => void;
+  onApplyWorkAssignment: () => void;
   /** Called with the trimmed description when the textarea blurs. */
   onDescriptionChange: (description: string) => void;
   onClose: () => void;
 };
 
 /**
- * Bottom-dock card for editing a selected timeline segment's description,
- * and (for Eat segments) assigning meals.
+ * Bottom-dock card for editing a selected timeline segment's description, and (for Eat segments)
+ * assigning meals, or (for Work segments) logging hours to the Work Tracker.
  */
 function SegmentEditorPanel({
   contextLabel,
@@ -29,12 +44,23 @@ function SegmentEditorPanel({
   selectedMealIds,
   onToggleMeal,
   onSubmitMeals,
+  isWorkSegment,
+  workProjects,
+  workProjectId,
+  workStartTime,
+  workEndTime,
+  onWorkProjectChange,
+  onWorkRangeChange,
+  onApplyWorkAssignment,
   onDescriptionChange,
   onClose
 }: SegmentEditorPanelProps) {
   const [localDescription, setLocalDescription] = useState(description);
   const sortedMeals = useMemo(() => [...meals].sort((a, b) => a.name.localeCompare(b.name)), [meals]);
   const selectedMealIdSet = useMemo(() => new Set(selectedMealIds), [selectedMealIds]);
+
+  const workParsedHours = parseTimeRangeToHours(workStartTime, workEndTime);
+  const canApplyWork = workProjectId.length > 0 && workParsedHours !== null;
 
   return (
     <div className="space-y-4">
@@ -118,6 +144,54 @@ function SegmentEditorPanel({
               Submit
             </button>
           </div>
+        </div>
+      ) : null}
+
+      {isWorkSegment ? (
+        <div className="space-y-3 border-t border-app-border pt-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-app-muted">
+            Log to Work Tracker
+          </p>
+
+          {workProjects.length === 0 ? (
+            <p className="py-4 text-center text-sm text-app-muted">
+              Add a project in Settings first to log hours.
+            </p>
+          ) : (
+            <>
+              <TimeRangeSlider startTime={workStartTime} endTime={workEndTime} onChange={onWorkRangeChange} />
+
+              <div className="flex items-center gap-2">
+                <select
+                  value={workProjectId}
+                  onChange={(e) => onWorkProjectChange(e.target.value)}
+                  className={compactSelectClassName}
+                  aria-label="Project"
+                >
+                  {workProjects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+
+                {workParsedHours !== null && (
+                  <p className="text-xs text-app-muted">
+                    {workParsedHours} hour{workParsedHours === 1 ? "" : "s"}
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={onApplyWorkAssignment}
+                  disabled={!canApplyWork}
+                  className="ml-auto rounded-md bg-app-accent px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-app-accentStrong disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Apply
+                </button>
+              </div>
+            </>
+          )}
         </div>
       ) : null}
     </div>

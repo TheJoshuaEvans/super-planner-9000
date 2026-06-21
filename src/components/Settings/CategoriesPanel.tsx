@@ -124,8 +124,9 @@ function CategoriesPanel() {
         <div className="space-y-1">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-app-muted">Categories</h3>
           <p className="text-sm text-app-text">
-            Add, rename, recolor, or remove the categories used for timeline blocks. "Eat" cannot be removed
-            because it powers meal assignment, but it can still be renamed and recolored.
+            Add, rename, recolor, or remove the categories used for timeline blocks. "Eat" and "Work" cannot be
+            removed because they power meal assignment and the Work Tracker, but both can still be renamed and
+            recolored.
           </p>
         </div>
         {mode === "list" && (

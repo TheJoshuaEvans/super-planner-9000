@@ -37,6 +37,8 @@ import {
   formatPasteTargetLabel,
   getRelativeWeekDayLabel
 } from "./lib/plannerViewHelpers";
+import { slotToTimeString } from "./lib/timeRangeSlider";
+import { parseTimeRangeToHours } from "./lib/workHours";
 import { useConfirmDialogStore } from "./store/confirmDialogStore";
 import { usePlannerStore } from "./store/plannerStore";
 import { useMealStore } from "./store/mealStore";
@@ -76,6 +78,8 @@ function App() {
   const setSegmentDescriptionForDate = usePlannerStore((state) => state.setSegmentDescriptionForDate);
   const pasteSegmentsForDate = usePlannerStore((state) => state.pasteSegmentsForDate);
   const meals = useMealStore((state) => state.meals);
+  const workProjects = useWorkTrackerStore((state) => state.projects);
+  const addWorkEntry = useWorkTrackerStore((state) => state.addEntry);
   const canUndoPlannerEdit = usePlannerStore((state) => state.canUndo);
   const canRedoPlannerEdit = usePlannerStore((state) => state.canRedo);
   const undoPlannerEdit = usePlannerStore((state) => state.undoPlannerEdit);
@@ -95,6 +99,7 @@ function App() {
   const currentWeekDateKeys = Array.from({ length: 7 }, (_, offset) =>
     getRelativeCalendarDateKey(offset, parseCalendarDateKey(todayDateKey) ?? new Date())
   );
+  const yesterdayDateKey = getRelativeCalendarDateKey(-1, parseCalendarDateKey(todayDateKey) ?? new Date());
 
   const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
   const [copiedTimelineSegments, setCopiedTimelineSegments] = useState<PlannerSegment[] | null>(null);
@@ -104,6 +109,10 @@ function App() {
   const trackElementsByDateKeyRef = useRef<Map<PlannerDateKey, HTMLDivElement>>(new Map());
   const [selectedSegment, setSelectedSegment] = useState<SelectedSegment | null>(null);
   const [pendingMealIds, setPendingMealIds] = useState<string[]>([]);
+  const [pendingWorkAssignment, setPendingWorkAssignment] = useState<
+    { projectId: string; startTime: string; endTime: string } | null
+  >(null);
+  const [isYesterdayExpanded, setIsYesterdayExpanded] = useState(false);
   const [isPortraitWarningDismissed, setIsPortraitWarningDismissed] = useState<boolean>(() => {
     if (typeof window === "undefined") {
       return false;
@@ -200,6 +209,7 @@ function App() {
       setDraggingCategoryId(null);
       setSelectedSegment(null);
       setPendingMealIds([]);
+      setPendingWorkAssignment(null);
       showToast({
         title: "Planner imported",
         message: "The current planner state was replaced with the imported file.",
@@ -338,6 +348,7 @@ function App() {
     setActiveTab(tab);
     setSelectedSegment(null);
     setPendingMealIds([]);
+    setPendingWorkAssignment(null);
   }
 
   /**
@@ -362,6 +373,37 @@ function App() {
   }
 
   /**
+   * Renders the Yesterday accordion's toggle row. Used standalone when collapsed, and as
+   * `TimelineTrack`'s `titleContent` when expanded so it shares a row with Copy/Paste/etc.
+   *
+   * @param isExpanded - Whether to render the chevron rotated open.
+   * @param fullWidth - Whether the button should fill its row (only when standalone).
+   */
+  function renderYesterdayToggle(isExpanded: boolean, fullWidth: boolean): ReactElement {
+    return (
+      <button
+        type="button"
+        onClick={() => setIsYesterdayExpanded((current) => !current)}
+        className={`flex items-center gap-2 text-left ${fullWidth ? "w-full" : ""}`}
+        aria-expanded={isExpanded}
+      >
+        <svg
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+          className={`h-4 w-4 shrink-0 text-app-muted transition-transform ${isExpanded ? "rotate-90" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <span className="text-base font-semibold tracking-tight">Yesterday</span>
+        <span className="text-sm text-app-muted">{formatDashboardDateSubtitle(yesterdayDateKey)}</span>
+      </button>
+    );
+  }
+
+  /**
    * Hides the portrait warning overlay for the duration of the current browser session.
    */
   function handleDismissPortraitWarning(): void {
@@ -370,11 +412,21 @@ function App() {
   }
 
   /**
-   * Opens the segment editor dock for any clicked block, seeding pending meals for Eat segments.
+   * Opens the segment editor dock for any clicked block, seeding pending meals for Eat segments
+   * or a pending Work Tracker assignment (defaulted to the block's own time span) for Work segments.
    */
   function handleSegmentClick(dateKey: PlannerDateKey, segment: PlannerSegment): void {
     setSelectedSegment({ dateKey, segmentId: segment.id });
     setPendingMealIds(segment.categoryId === "eat" ? (segment.assignedMealIds ?? []) : []);
+    setPendingWorkAssignment(
+      segment.categoryId === "work"
+        ? {
+            projectId: workProjects[0]?.id ?? "",
+            startTime: slotToTimeString(segment.startSlot),
+            endTime: slotToTimeString(segment.endSlot)
+          }
+        : null
+    );
   }
 
   /**
@@ -385,11 +437,12 @@ function App() {
   }
 
   /**
-   * Closes the segment editor dock without saving meal changes.
+   * Closes the segment editor dock without saving meal or work-assignment changes.
    */
   function handleCloseSegmentEditor(): void {
     setSelectedSegment(null);
     setPendingMealIds([]);
+    setPendingWorkAssignment(null);
   }
 
   /**
@@ -413,6 +466,52 @@ function App() {
 
     setSelectedSegment(null);
     setPendingMealIds([]);
+  }
+
+  /**
+   * Updates the pending project selection for the open Work segment's editor.
+   */
+  function handleWorkProjectChange(projectId: string): void {
+    setPendingWorkAssignment((current) => (current ? { ...current, projectId } : current));
+  }
+
+  /**
+   * Updates the pending time range for the open Work segment's editor.
+   */
+  function handleWorkRangeChange(startTime: string, endTime: string): void {
+    setPendingWorkAssignment((current) => (current ? { ...current, startTime, endTime } : current));
+  }
+
+  /**
+   * Logs the pending time range as a new Work Tracker entry for the selected Work segment's date,
+   * then closes the dock. Each Apply creates a fresh entry — there is no persisted link between a
+   * segment and the entries it has produced, so reapplying never edits a prior entry in place.
+   */
+  function handleApplyWorkAssignment(): void {
+    if (!selectedSegment || !pendingWorkAssignment) {
+      return;
+    }
+
+    const hours = parseTimeRangeToHours(pendingWorkAssignment.startTime, pendingWorkAssignment.endTime);
+
+    if (!pendingWorkAssignment.projectId || hours === null) {
+      return;
+    }
+
+    addWorkEntry(selectedSegment.dateKey, pendingWorkAssignment.projectId, hours);
+
+    const projectName =
+      workProjects.find((project) => project.id === pendingWorkAssignment.projectId)?.name ?? "the selected project";
+
+    showToast({
+      title: "Hours logged",
+      message: `Logged ${hours} hour${hours === 1 ? "" : "s"} to ${projectName}.`,
+      level: "success"
+    });
+
+    setSelectedSegment(null);
+    setPendingMealIds([]);
+    setPendingWorkAssignment(null);
   }
 
   /**
@@ -472,6 +571,60 @@ function App() {
 
           {activeTabDefinition.contentKind === "dashboard" ? (
             <section className="flex flex-1 flex-col gap-5">
+              <div className="space-y-3 rounded-lg border border-app-border bg-app-surface p-4">
+                {!isYesterdayExpanded ? renderYesterdayToggle(false, true) : null}
+
+                {isYesterdayExpanded ? (
+                  <TimelineTrack
+                    dateKey={yesterdayDateKey}
+                    compact
+                    titleContent={renderYesterdayToggle(true, false)}
+                    categories={categories}
+                    segments={segmentsByDate[yesterdayDateKey] ?? []}
+                    meals={meals}
+                    canPasteTimeline={canPasteTimeline}
+                    onMoveSegment={(segmentId, nextStartSlot) =>
+                      moveSegmentForDate(yesterdayDateKey, segmentId, nextStartSlot)
+                    }
+                    onMoveSegmentAcrossDates={(segmentId, nextStartSlot, targetDateKey) =>
+                      moveSegmentAcrossDates(yesterdayDateKey, segmentId, targetDateKey, nextStartSlot)
+                    }
+                    onResizeSegment={(segmentId, nextStartSlot, nextEndSlot) =>
+                      resizeSegmentForDate(yesterdayDateKey, segmentId, nextStartSlot, nextEndSlot)
+                    }
+                    draggingCategoryId={draggingCategoryId}
+                    onCopyTimeline={() => handleCopyTimeline(yesterdayDateKey)}
+                    onPasteTimeline={() => handlePasteTimeline(yesterdayDateKey)}
+                    onClearTimeline={() => handleClearTimeline(yesterdayDateKey, formatCalendarDateLabel(yesterdayDateKey))}
+                    onDropCategory={(categoryId, startSlot, endSlot) =>
+                      handleDropCategory(yesterdayDateKey, categoryId, startSlot, endSlot)
+                    }
+                    onDeleteSegment={(segmentId) => deleteSegmentForDate(yesterdayDateKey, segmentId)}
+                    onSegmentClick={(segment) => handleSegmentClick(yesterdayDateKey, segment)}
+                    selectedSegmentId={
+                      selectedSegment?.dateKey === yesterdayDateKey && yesterdayDateKey !== selectedDateKey
+                        ? selectedSegment.segmentId
+                        : null
+                    }
+                    pendingMealIds={pendingMealIds}
+                    onToggleAssignedMeal={handleToggleAssignedMeal}
+                    onSubmitMealAssignment={handleSubmitMealAssignment}
+                    workProjects={workProjects}
+                    pendingWorkAssignment={pendingWorkAssignment}
+                    onWorkProjectChange={handleWorkProjectChange}
+                    onWorkRangeChange={handleWorkRangeChange}
+                    onApplyWorkAssignment={handleApplyWorkAssignment}
+                    onCloseSegmentEditor={handleCloseSegmentEditor}
+                    onDescriptionChange={handleDescriptionChange}
+                    trackElementsByDateKey={trackElementsByDateKeyRef}
+                    registerTrackElement={(element) => handleRegisterTrackElement(yesterdayDateKey, element)}
+                    crossDragPreview={crossDragPreview?.targetDateKey === yesterdayDateKey ? crossDragPreview : null}
+                    onCrossTrackHoverChange={setCrossDragPreview}
+                    showCurrentTimeMarker={false}
+                  />
+                ) : null}
+              </div>
+
               {currentWeekDateKeys.map((dateKey, dayOffset) => {
                 const relativeLabel = getRelativeWeekDayLabel(dayOffset);
                 return (
@@ -509,6 +662,11 @@ function App() {
                     pendingMealIds={pendingMealIds}
                     onToggleAssignedMeal={handleToggleAssignedMeal}
                     onSubmitMealAssignment={handleSubmitMealAssignment}
+                    workProjects={workProjects}
+                    pendingWorkAssignment={pendingWorkAssignment}
+                    onWorkProjectChange={handleWorkProjectChange}
+                    onWorkRangeChange={handleWorkRangeChange}
+                    onApplyWorkAssignment={handleApplyWorkAssignment}
                     onCloseSegmentEditor={handleCloseSegmentEditor}
                     onDescriptionChange={handleDescriptionChange}
                     trackElementsByDateKey={trackElementsByDateKeyRef}
@@ -597,6 +755,11 @@ function App() {
                     pendingMealIds={pendingMealIds}
                     onToggleAssignedMeal={handleToggleAssignedMeal}
                     onSubmitMealAssignment={handleSubmitMealAssignment}
+                    workProjects={workProjects}
+                    pendingWorkAssignment={pendingWorkAssignment}
+                    onWorkProjectChange={handleWorkProjectChange}
+                    onWorkRangeChange={handleWorkRangeChange}
+                    onApplyWorkAssignment={handleApplyWorkAssignment}
                     onCloseSegmentEditor={handleCloseSegmentEditor}
                     onDescriptionChange={handleDescriptionChange}
                   />
