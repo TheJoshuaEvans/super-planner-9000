@@ -37,7 +37,7 @@ export function parseHoursInput(raw: string): number | null {
  * @param time - Candidate time string, as produced by an `<input type="time">`.
  * @returns Total minutes since midnight, or null if malformed.
  */
-function parseTimeStringToMinutes(time: string): number | null {
+export function parseTimeStringToMinutes(time: string): number | null {
   const match = /^(\d{2}):(\d{2})$/.exec(time);
 
   if (!match) {
@@ -55,7 +55,9 @@ function parseTimeStringToMinutes(time: string): number | null {
 }
 
 /**
- * Converts an HH:MM start/end time-range pair into a decimal hour count.
+ * Converts an HH:MM start/end time-range pair into a decimal hour count. An end time of "00:00"
+ * is treated as midnight at the end of the day (24:00) rather than the start of it, since it can
+ * never validly mean the latter — this is what makes a range like "23:45" to "00:00" possible.
  *
  * @param startTime - 24-hour "HH:MM" string, e.g. from `<input type="time">`.
  * @param endTime - 24-hour "HH:MM" string; must be strictly later than startTime (same day only).
@@ -65,11 +67,17 @@ export function parseTimeRangeToHours(startTime: string, endTime: string): numbe
   const startMinutes = parseTimeStringToMinutes(startTime);
   const endMinutes = parseTimeStringToMinutes(endTime);
 
-  if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
+  if (startMinutes === null || endMinutes === null) {
     return null;
   }
 
-  return roundToQuarterHour((endMinutes - startMinutes) / 60);
+  const effectiveEndMinutes = endMinutes === 0 ? 24 * 60 : endMinutes;
+
+  if (effectiveEndMinutes <= startMinutes) {
+    return null;
+  }
+
+  return roundToQuarterHour((effectiveEndMinutes - startMinutes) / 60);
 }
 
 /**

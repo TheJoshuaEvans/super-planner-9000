@@ -41,7 +41,7 @@ function WorkTracker() {
 
       {selectedDateKey ? (
         <section className="fixed inset-x-0 bottom-0 z-50 px-4 pb-4 lg:px-6 lg:pb-5">
-          <div className="mx-auto w-full max-w-[96rem] rounded-lg border border-app-border bg-app-surface/95 p-4 shadow-card backdrop-blur">
+          <div className="mx-auto max-h-[70vh] w-full max-w-[96rem] overflow-y-auto rounded-lg border border-app-border bg-app-surface/95 p-4 shadow-card backdrop-blur">
             <WorkEntryDock
               dateKey={selectedDateKey}
               dateLabel={formatCalendarDateLabel(selectedDateKey)}

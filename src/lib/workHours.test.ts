@@ -49,6 +49,11 @@ describe("parseTimeRangeToHours", () => {
     expect(parseTimeRangeToHours("09:00", "09:00")).toBeNull();
   });
 
+  it("treats a 00:00 end time as midnight at the end of the day", () => {
+    expect(parseTimeRangeToHours("09:00", "00:00")).toBe(15);
+    expect(parseTimeRangeToHours("23:45", "00:00")).toBe(0.25);
+  });
+
   it("rejects malformed time strings", () => {
     expect(parseTimeRangeToHours("9:00", "17:00")).toBeNull();
     expect(parseTimeRangeToHours("09:00", "25:00")).toBeNull();

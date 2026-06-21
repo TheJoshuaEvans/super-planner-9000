@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from "react";
+import TimeRangeSlider from "../TimeRangeSlider/TimeRangeSlider";
 import { parseHoursInput, parseTimeRangeToHours } from "../../lib/workHours";
+import { useWorkEntryDraftStore } from "../../store/workEntryDraftStore";
 import { useWorkTrackerStore } from "../../store/workTrackerStore";
 import type { WorkEntry, WorkProject } from "../../store/workTrackerStore";
 
@@ -43,20 +45,25 @@ function WorkEntryDock({ dateKey, dateLabel, entries, projects, onClose }: WorkE
   const updateEntry = useWorkTrackerStore((state) => state.updateEntry);
   const deleteEntry = useWorkTrackerStore((state) => state.deleteEntry);
 
+  const draftStartTime = useWorkEntryDraftStore((state) => state.draftStartTime);
+  const draftEndTime = useWorkEntryDraftStore((state) => state.draftEndTime);
+  const setDraftRange = useWorkEntryDraftStore((state) => state.setDraftRange);
+
   const [mode, setMode] = useState<FormMode>("list");
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [inputMode, setInputMode] = useState<InputMode>("hours");
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [hoursText, setHoursText] = useState("");
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
 
-  const parsedHours = inputMode === "hours" ? parseHoursInput(hoursText) : parseTimeRangeToHours(startTime, endTime);
+  const parsedHours =
+    inputMode === "hours" ? parseHoursInput(hoursText) : parseTimeRangeToHours(draftStartTime, draftEndTime);
   const canSave = selectedProjectId.length > 0 && parsedHours !== null;
 
   /**
    * Opens the add form with an empty state, defaulting the project to whichever was last used
-   * so logging the same project across several days in a row doesn't require reselecting it.
+   * so logging the same project across several days in a row doesn't require reselecting it. The
+   * time-range slider's handles are left as-is — they persist globally (see workEntryDraftStore)
+   * so a start handle set hours ago, even before a page reload, is still there to finish off.
    */
   function handleStartAdd(): void {
     setMode("add");
@@ -66,8 +73,6 @@ function WorkEntryDock({ dateKey, dateLabel, entries, projects, onClose }: WorkE
       current && projects.some((project) => project.id === current) ? current : projects[0]?.id ?? ""
     );
     setHoursText("");
-    setStartTime("");
-    setEndTime("");
   }
 
   /**
@@ -81,8 +86,6 @@ function WorkEntryDock({ dateKey, dateLabel, entries, projects, onClose }: WorkE
     setInputMode("hours");
     setSelectedProjectId(entry.projectId);
     setHoursText(String(entry.hours));
-    setStartTime("");
-    setEndTime("");
   }
 
   /**
@@ -183,23 +186,7 @@ function WorkEntryDock({ dateKey, dateLabel, entries, projects, onClose }: WorkE
                   aria-label="Hours worked"
                 />
               ) : (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="time"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                    className={inputClassName}
-                    aria-label="Start time"
-                  />
-                  <span className="text-sm text-app-muted">to</span>
-                  <input
-                    type="time"
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                    className={inputClassName}
-                    aria-label="End time"
-                  />
-                </div>
+                <TimeRangeSlider startTime={draftStartTime} endTime={draftEndTime} onChange={setDraftRange} />
               )}
 
               {parsedHours !== null && <p className="text-xs text-app-muted">{parsedHours} hour{parsedHours === 1 ? "" : "s"}</p>}
