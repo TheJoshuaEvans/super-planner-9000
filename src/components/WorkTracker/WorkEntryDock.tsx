@@ -14,6 +14,9 @@ const primaryButtonClassName =
 const secondaryButtonClassName =
   "rounded-md border border-app-border bg-app-panel/85 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-app-muted transition hover:border-app-accent/70 hover:text-app-text";
 
+const compactSelectClassName =
+  "w-36 shrink-0 rounded-md border border-app-border bg-app-bg px-2 py-1.5 text-xs text-app-text focus:border-app-accent/60 focus:outline-none focus:ring-2 focus:ring-app-accent/20";
+
 const rowButtonClassName =
   "rounded-sm border border-app-border px-2 py-0.5 text-xs text-app-muted transition hover:border-app-accent/60 hover:text-app-text";
 
@@ -144,19 +147,6 @@ function WorkEntryDock({ dateKey, dateLabel, entries, projects, onClose }: WorkE
                 {mode === "add" ? "New Entry" : "Edit Entry"}
               </p>
 
-              <select
-                value={selectedProjectId}
-                onChange={(e) => setSelectedProjectId(e.target.value)}
-                className={inputClassName}
-                aria-label="Project"
-              >
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
-
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -191,7 +181,19 @@ function WorkEntryDock({ dateKey, dateLabel, entries, projects, onClose }: WorkE
 
               {parsedHours !== null && <p className="text-xs text-app-muted">{parsedHours} hour{parsedHours === 1 ? "" : "s"}</p>}
 
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedProjectId}
+                  onChange={(e) => setSelectedProjectId(e.target.value)}
+                  className={compactSelectClassName}
+                  aria-label="Project"
+                >
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
                 <button type="submit" disabled={!canSave} className={primaryButtonClassName}>
                   Save
                 </button>
