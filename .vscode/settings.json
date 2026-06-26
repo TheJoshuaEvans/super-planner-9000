@@ -15,6 +15,7 @@
   "testing.automaticallyOpenPeekView": "never",
   "testing.defaultGutterClickAction": "run",
   "cSpell.words": [
+    "autorestart",
     "Avenir",
     "partialize"
   ]

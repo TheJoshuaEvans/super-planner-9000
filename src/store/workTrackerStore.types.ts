@@ -5,6 +5,12 @@
 export type WorkClient = {
   id: string;
   name: string;
+  /** Point-of-contact name for this client. */
+  contactName: string;
+  /** Point-of-contact email address for this client. */
+  contactEmail: string;
+  /** Optional company/organization name for this client. */
+  company?: string;
 };
 
 /**
@@ -37,22 +43,41 @@ export type WorkEntry = {
 export type WorkEntriesByDate = Record<WorkDateKey, WorkEntry[]>;
 
 /**
+ * The user's own contact details, used as the "from" party when generating invoices and other
+ * billing documents. A single record, not a list — fields may be blank until filled in. Address
+ * parts are stored separately (rather than as one free-text field) so they can be formatted
+ * however invoices/documents need later.
+ */
+export type UserContactInfo = {
+  name: string;
+  email: string;
+  phone: string;
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+};
+
+/**
  * Persisted work tracker data that should be exported/imported as a unit.
  */
 export type WorkTrackerPersistedData = {
   clients: WorkClient[];
   projects: WorkProject[];
   entriesByDate: WorkEntriesByDate;
+  userContactInfo: UserContactInfo;
 };
 
 /**
  * Work tracker store state plus all actions exposed to the UI.
  */
 export type WorkTrackerStore = WorkTrackerPersistedData & {
-  /** Adds a new client to the library. */
-  addClient: (name: string) => void;
-  /** Updates the name of an existing client by id. */
-  updateClient: (id: string, name: string) => void;
+  /** Adds a new client to the library, with a point-of-contact name and email, and an optional company name. */
+  addClient: (name: string, contactName: string, contactEmail: string, company?: string) => void;
+  /** Updates the name, point-of-contact name/email, and company name of an existing client by id. */
+  updateClient: (id: string, name: string, contactName: string, contactEmail: string, company?: string) => void;
   /** Removes a client, cascading to remove its projects and any entries logged against them. */
   deleteClient: (id: string) => void;
 
@@ -69,6 +94,9 @@ export type WorkTrackerStore = WorkTrackerPersistedData & {
   updateEntry: (dateKey: WorkDateKey, entryId: string, projectId: string, hours: number) => void;
   /** Removes a single entry by id from a given date. */
   deleteEntry: (dateKey: WorkDateKey, entryId: string) => void;
+
+  /** Updates one or more fields of the user's own contact info (name/email/phone/address parts). */
+  updateUserContactInfo: (patch: Partial<UserContactInfo>) => void;
 
   /** Replaces the entire persisted state (used by data import). */
   replaceWorkTrackerData: (data: WorkTrackerPersistedData) => void;

@@ -1,18 +1,22 @@
 import { useMemo, useState } from "react";
+import InvoiceOverview from "./InvoiceOverview";
 import WorkEntryDock from "./WorkEntryDock";
 import WorkHoursChart from "./WorkHoursChart";
 import WorkTrackerCalendar from "./WorkTrackerCalendar";
 import { formatCalendarDateLabel, getMonthStart } from "../../lib/calendar";
 import { buildMonthlyWorkChartData } from "../../lib/workTrackerChart";
+import { buildMonthlyInvoiceOverview } from "../../lib/workTrackerInvoice";
 import { useTodayDateKey } from "../../hooks/useTodayDateKey";
 import { useWorkTrackerStore } from "../../store/workTrackerStore";
 
 /**
  * Work Tracker page: a monthly cumulative hours chart over a calendar for logging hours per
- * project per day. Fully self-contained, like the Meal Creator tab — it owns its own visible
- * month and selected-date state and renders its own docked entry editor.
+ * project per day, plus an invoice overview breaking down value earned by client and project.
+ * Fully self-contained, like the Meal Creator tab — it owns its own visible month and
+ * selected-date state and renders its own docked entry editor.
  */
 function WorkTracker() {
+  const clients = useWorkTrackerStore((state) => state.clients);
   const projects = useWorkTrackerStore((state) => state.projects);
   const entriesByDate = useWorkTrackerStore((state) => state.entriesByDate);
 
@@ -25,9 +29,21 @@ function WorkTracker() {
     [visibleMonth, entriesByDate, projects]
   );
 
+  const invoiceOverview = useMemo(
+    () => buildMonthlyInvoiceOverview(visibleMonth, entriesByDate, projects, clients),
+    [visibleMonth, entriesByDate, projects, clients]
+  );
+
+  const monthLabel = useMemo(
+    () => new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(visibleMonth),
+    [visibleMonth]
+  );
+
   return (
     <section className={`flex flex-1 flex-col gap-5 ${selectedDateKey ? "pb-64 lg:pb-72" : ""}`}>
       <WorkHoursChart data={chartData} projects={projects} />
+
+      <InvoiceOverview overview={invoiceOverview} monthLabel={monthLabel} />
 
       <WorkTrackerCalendar
         visibleMonth={visibleMonth}

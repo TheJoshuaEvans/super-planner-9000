@@ -1,6 +1,7 @@
 import type { ChangeEvent } from "react";
 import CategoriesPanel from "./CategoriesPanel";
 import ClientsPanel from "./ClientsPanel";
+import ContactInfoPanel from "./ContactInfoPanel";
 import GoogleCalendarPanel from "./GoogleCalendarPanel";
 import GoogleDrivePanel from "./GoogleDrivePanel";
 import NotificationsPanel from "./NotificationsPanel";
@@ -13,8 +14,9 @@ type SettingsProps = {
 };
 
 /**
- * Settings page: planner categories, Google Calendar integration, planner data import/export,
- * Drive cloud backup, and notification preferences.
+ * Settings page: planner categories, work-tracker clients/projects, the user's own contact info,
+ * Google Calendar integration, planner data import/export, Drive cloud backup, and notification
+ * preferences.
  */
 function Settings({ onExportPlannerData, onImportFileChange }: SettingsProps) {
   return (
@@ -24,6 +26,8 @@ function Settings({ onExportPlannerData, onImportFileChange }: SettingsProps) {
       <ClientsPanel />
 
       <ProjectsPanel />
+
+      <ContactInfoPanel />
 
       <GoogleCalendarPanel />
 

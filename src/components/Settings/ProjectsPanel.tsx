@@ -30,8 +30,7 @@ type FormMode = "list" | "add" | "edit";
 
 /**
  * Settings panel for adding, renaming, recoloring, and removing work-tracker projects. Every
- * project must be scoped to a client; if none exist yet, a client can be created inline without
- * leaving this form.
+ * project must be scoped to a client; add one in the Clients panel above first if none exist yet.
  */
 function ProjectsPanel() {
   const projects = useWorkTrackerStore((state) => state.projects);
@@ -40,7 +39,6 @@ function ProjectsPanel() {
   const addProject = useWorkTrackerStore((state) => state.addProject);
   const updateProject = useWorkTrackerStore((state) => state.updateProject);
   const deleteProject = useWorkTrackerStore((state) => state.deleteProject);
-  const addClient = useWorkTrackerStore((state) => state.addClient);
   const requestConfirm = useConfirmDialogStore((state) => state.requestConfirm);
 
   const [mode, setMode] = useState<FormMode>("list");
@@ -49,8 +47,6 @@ function ProjectsPanel() {
   const [formColor, setFormColor] = useState("#000000");
   const [formClientId, setFormClientId] = useState("");
   const [formHourlyRateText, setFormHourlyRateText] = useState("0");
-  const [showQuickAddClient, setShowQuickAddClient] = useState(false);
-  const [quickAddClientName, setQuickAddClientName] = useState("");
 
   const nameTaken = isProjectNameTaken(projects, formName, editingId ?? undefined);
   const parsedHourlyRate = parseHourlyRateInput(formHourlyRateText);
@@ -66,8 +62,6 @@ function ProjectsPanel() {
     setFormColor(pickNextProjectColor(projects));
     setFormClientId(clients[0]?.id ?? "");
     setFormHourlyRateText("0");
-    setShowQuickAddClient(false);
-    setQuickAddClientName("");
   }
 
   /**
@@ -82,8 +76,6 @@ function ProjectsPanel() {
     setFormColor(project.color);
     setFormClientId(project.clientId);
     setFormHourlyRateText(String(project.hourlyRate ?? 0));
-    setShowQuickAddClient(false);
-    setQuickAddClientName("");
   }
 
   /**
@@ -93,8 +85,6 @@ function ProjectsPanel() {
     setMode("list");
     setEditingId(null);
     setFormName("");
-    setShowQuickAddClient(false);
-    setQuickAddClientName("");
   }
 
   /**
@@ -111,23 +101,6 @@ function ProjectsPanel() {
       updateProject(editingId, formName, formColor, formClientId, parsedHourlyRate);
     }
     handleCancel();
-  }
-
-  /**
-   * Creates a new client inline from within the project form and selects it immediately.
-   */
-  function handleQuickAddClient(): void {
-    if (quickAddClientName.trim().length === 0) return;
-
-    addClient(quickAddClientName);
-    const created = useWorkTrackerStore.getState().clients.at(-1);
-
-    if (created) {
-      setFormClientId(created.id);
-    }
-
-    setShowQuickAddClient(false);
-    setQuickAddClientName("");
   }
 
   /**
@@ -238,33 +211,7 @@ function ProjectsPanel() {
               )}
             </select>
             {clients.length === 0 && (
-              <p className="text-xs text-app-muted">Add a client first, or create one below.</p>
-            )}
-
-            {showQuickAddClient ? (
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="New client name"
-                  value={quickAddClientName}
-                  onChange={(e) => setQuickAddClientName(e.target.value)}
-                  className={inputClassName}
-                />
-                <button type="button" onClick={handleQuickAddClient} className={primaryButtonClassName}>
-                  Add
-                </button>
-                <button type="button" onClick={() => setShowQuickAddClient(false)} className={secondaryButtonClassName}>
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowQuickAddClient(true)}
-                className={`${rowButtonClassName} inline-block`}
-              >
-                + New client
-              </button>
+              <p className="text-xs text-app-muted">Add a client in the Clients panel above first.</p>
             )}
           </div>
 

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import {
   addEntryToDate,
+  BLANK_USER_CONTACT_INFO,
   createClient,
   createEntry,
   createProject,
@@ -17,6 +18,7 @@ import {
 import type { WorkTrackerPersistedData, WorkTrackerStore } from "./workTrackerStore.types";
 
 export type {
+  UserContactInfo,
   WorkClient,
   WorkDateKey,
   WorkEntriesByDate,
@@ -28,18 +30,24 @@ export type {
 const initialState: WorkTrackerPersistedData = {
   clients: [],
   projects: [],
-  entriesByDate: {}
+  entriesByDate: {},
+  userContactInfo: BLANK_USER_CONTACT_INFO
 };
 
 /**
- * Local persisted Zustand store for work-tracker clients, projects, and logged hour entries.
+ * Local persisted Zustand store for work-tracker clients, projects, logged hour entries, and the
+ * user's own contact info (used as the "from" party on invoices).
  */
 export const useWorkTrackerStore = create<WorkTrackerStore>()(
   persist(
     (set) => ({
       ...initialState,
-      addClient: (name) => set((state) => ({ clients: [...state.clients, createClient(name)] })),
-      updateClient: (id, name) => set((state) => ({ clients: updateClientInList(state.clients, id, name) })),
+      addClient: (name, contactName, contactEmail, company) =>
+        set((state) => ({ clients: [...state.clients, createClient(name, contactName, contactEmail, company)] })),
+      updateClient: (id, name, contactName, contactEmail, company) =>
+        set((state) => ({
+          clients: updateClientInList(state.clients, id, name, contactName, contactEmail, company)
+        })),
       deleteClient: (id) =>
         set((state) => {
           const orphanedProjectIds = state.projects
@@ -74,9 +82,18 @@ export const useWorkTrackerStore = create<WorkTrackerStore>()(
       deleteEntry: (dateKey, entryId) =>
         set((state) => ({ entriesByDate: removeEntryFromDate(state.entriesByDate, dateKey, entryId) })),
 
+      updateUserContactInfo: (patch) =>
+        set((state) => ({ userContactInfo: { ...state.userContactInfo, ...patch } })),
+
       replaceWorkTrackerData: (data) =>
-        set({ clients: data.clients, projects: data.projects, entriesByDate: data.entriesByDate }),
-      resetWorkTrackerStore: () => set({ clients: [], projects: [], entriesByDate: {} })
+        set({
+          clients: data.clients,
+          projects: data.projects,
+          entriesByDate: data.entriesByDate,
+          userContactInfo: data.userContactInfo
+        }),
+      resetWorkTrackerStore: () =>
+        set({ clients: [], projects: [], entriesByDate: {}, userContactInfo: BLANK_USER_CONTACT_INFO })
     }),
     {
       name: "sp9000-work-tracker-state",

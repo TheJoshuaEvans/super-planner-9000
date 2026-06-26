@@ -1,5 +1,18 @@
 import { COLORBLIND_SAFE_PALETTE } from "./colorPalette";
-import type { WorkClient, WorkEntriesByDate, WorkEntry, WorkProject } from "../store/workTrackerStore.types";
+import type { UserContactInfo, WorkClient, WorkEntriesByDate, WorkEntry, WorkProject } from "../store/workTrackerStore.types";
+
+/** Default blank value for the user's own contact info, before they've filled anything in. */
+export const BLANK_USER_CONTACT_INFO: UserContactInfo = {
+  name: "",
+  email: "",
+  phone: "",
+  addressLine1: "",
+  addressLine2: "",
+  city: "",
+  state: "",
+  postalCode: "",
+  country: ""
+};
 
 /**
  * Generates a unique identifier with the given prefix.
@@ -15,10 +28,19 @@ function createId(prefix: string): string {
  * Creates a new WorkClient with a generated id.
  *
  * @param name - Display name for the client.
+ * @param contactName - Point-of-contact name.
+ * @param contactEmail - Point-of-contact email address.
+ * @param company - Optional company/organization name.
  * @returns A new WorkClient.
  */
-export function createClient(name: string): WorkClient {
-  return { id: createId("client"), name: name.trim() };
+export function createClient(name: string, contactName: string, contactEmail: string, company = ""): WorkClient {
+  return {
+    id: createId("client"),
+    name: name.trim(),
+    contactName: contactName.trim(),
+    contactEmail: contactEmail.trim(),
+    company: company.trim() || undefined
+  };
 }
 
 /**
@@ -35,15 +57,47 @@ export function isClientNameTaken(clients: WorkClient[], name: string, excludeId
 }
 
 /**
- * Returns a new list with the target client's name updated.
+ * Returns true if the given email string is non-empty but not a plausible email address. Used to
+ * gate form submission on an obviously malformed value without being a full RFC validator.
+ *
+ * @param email - Candidate email address.
+ * @returns Whether the non-empty string fails a basic "text@text.text" shape check.
+ */
+export function isMalformedEmail(email: string): boolean {
+  const trimmed = email.trim();
+  return trimmed !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+}
+
+/**
+ * Returns a new list with the target client's name, contact name, contact email, and company updated.
  *
  * @param clients - Existing client list.
  * @param id - Id of the client to update.
  * @param name - New name value.
+ * @param contactName - New point-of-contact name.
+ * @param contactEmail - New point-of-contact email address.
+ * @param company - New company/organization name (empty string clears it).
  * @returns Updated client list.
  */
-export function updateClientInList(clients: WorkClient[], id: string, name: string): WorkClient[] {
-  return clients.map((client) => (client.id === id ? { ...client, name: name.trim() } : client));
+export function updateClientInList(
+  clients: WorkClient[],
+  id: string,
+  name: string,
+  contactName: string,
+  contactEmail: string,
+  company = ""
+): WorkClient[] {
+  return clients.map((client) =>
+    client.id === id
+      ? {
+          ...client,
+          name: name.trim(),
+          contactName: contactName.trim(),
+          contactEmail: contactEmail.trim(),
+          company: company.trim() || undefined
+        }
+      : client
+  );
 }
 
 /**

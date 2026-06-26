@@ -1,7 +1,9 @@
+import { migratePlannerDataExport } from "./plannerDataMigrations";
 import { TOTAL_DAY_SLOTS } from "./timeline";
 import type { PlannerCategory, PlannerPersistedData, PlannerSegment, PlannerSegmentsByDate } from "../store/plannerStore";
 import type { Meal, MealComponent, MealIngredient, MealPersistedData } from "../store/mealStore.types";
 import type {
+  UserContactInfo,
   WorkClient,
   WorkEntriesByDate,
   WorkEntry,
@@ -10,7 +12,7 @@ import type {
 } from "../store/workTrackerStore.types";
 
 export const PLANNER_DATA_EXPORT_APP = "super-planner-9000" as const;
-export const PLANNER_DATA_EXPORT_VERSION = 5 as const;
+export const PLANNER_DATA_EXPORT_VERSION = 7 as const;
 
 export type PlannerDataExportEnvelope = {
   app: typeof PLANNER_DATA_EXPORT_APP;
@@ -184,13 +186,21 @@ function isMealPersistedData(value: unknown): value is MealPersistedData {
 }
 
 /**
- * Validates a single work client shape.
+ * Validates a single work client shape, including its required contact name/email fields and
+ * optional company name.
  *
  * @param value - Unknown candidate client.
  * @returns Whether the value matches WorkClient fields.
  */
 function isWorkClient(value: unknown): value is WorkClient {
-  return isPlainObject(value) && isString(value.id) && isString(value.name);
+  return (
+    isPlainObject(value) &&
+    isString(value.id) &&
+    isString(value.name) &&
+    isString(value.contactName) &&
+    isString(value.contactEmail) &&
+    (value.company === undefined || isString(value.company))
+  );
 }
 
 /**
@@ -244,12 +254,33 @@ function isWorkEntriesByDate(value: unknown): value is WorkEntriesByDate {
 }
 
 /**
+ * Validates the user's own contact info shape. Fields are always present strings but may be blank.
+ *
+ * @param value - Unknown candidate contact info.
+ * @returns Whether the value matches UserContactInfo fields.
+ */
+function isUserContactInfo(value: unknown): value is UserContactInfo {
+  return (
+    isPlainObject(value) &&
+    isString(value.name) &&
+    isString(value.email) &&
+    isString(value.phone) &&
+    isString(value.addressLine1) &&
+    isString(value.addressLine2) &&
+    isString(value.city) &&
+    isString(value.state) &&
+    isString(value.postalCode) &&
+    isString(value.country)
+  );
+}
+
+/**
  * Validates the persisted work tracker payload shape. Does not check that a project's clientId
  * or an entry's projectId resolves to an existing record, matching the same referential leniency
  * already used for segment categoryId and meal ingredient componentId references.
  *
  * @param value - Unknown candidate persisted payload.
- * @returns Whether clients, projects, and per-date entries are valid.
+ * @returns Whether clients, projects, per-date entries, and the user's contact info are valid.
  */
 function isWorkTrackerPersistedData(value: unknown): value is WorkTrackerPersistedData {
   return (
@@ -258,7 +289,8 @@ function isWorkTrackerPersistedData(value: unknown): value is WorkTrackerPersist
     value.clients.every((client) => isWorkClient(client)) &&
     Array.isArray(value.projects) &&
     value.projects.every((project) => isWorkProject(project)) &&
-    isWorkEntriesByDate(value.entriesByDate)
+    isWorkEntriesByDate(value.entriesByDate) &&
+    isUserContactInfo(value.userContactInfo)
   );
 }
 
@@ -326,7 +358,13 @@ function normalizeMealPersistedData(meals: MealPersistedData): MealPersistedData
  */
 function normalizeWorkTrackerPersistedData(workTracker: WorkTrackerPersistedData): WorkTrackerPersistedData {
   return {
-    clients: workTracker.clients.map((client) => ({ id: client.id, name: client.name })),
+    clients: workTracker.clients.map((client) => ({
+      id: client.id,
+      name: client.name,
+      contactName: client.contactName,
+      contactEmail: client.contactEmail,
+      ...(client.company ? { company: client.company } : {})
+    })),
     projects: workTracker.projects.map((project) => ({
       id: project.id,
       name: project.name,
@@ -339,7 +377,18 @@ function normalizeWorkTrackerPersistedData(workTracker: WorkTrackerPersistedData
         dateKey,
         entries.map((entry) => ({ id: entry.id, projectId: entry.projectId, hours: entry.hours }))
       ])
-    )
+    ),
+    userContactInfo: {
+      name: workTracker.userContactInfo.name,
+      email: workTracker.userContactInfo.email,
+      phone: workTracker.userContactInfo.phone,
+      addressLine1: workTracker.userContactInfo.addressLine1,
+      addressLine2: workTracker.userContactInfo.addressLine2,
+      city: workTracker.userContactInfo.city,
+      state: workTracker.userContactInfo.state,
+      postalCode: workTracker.userContactInfo.postalCode,
+      country: workTracker.userContactInfo.country
+    }
   };
 }
 
@@ -383,7 +432,9 @@ export function buildPlannerExportFilename(exportedAt: Date = new Date()): strin
 }
 
 /**
- * Parses and validates a planner export file, rejecting unsupported versions before deeper validation.
+ * Parses and validates a planner export file. Older but migratable versions are upgraded to the
+ * current shape first (see plannerDataMigrations.ts); versions with no migration path are
+ * rejected as unsupported, before deeper validation.
  */
 export function parsePlannerDataImport(text: string): PlannerDataImportResult {
   let parsed: unknown;
@@ -402,25 +453,27 @@ export function parsePlannerDataImport(text: string): PlannerDataImportResult {
     return { ok: false, error: "Import file was not created by this app." };
   }
 
-  if (parsed.version !== PLANNER_DATA_EXPORT_VERSION) {
-    return { ok: false, error: `Unsupported import version: ${String(parsed.version)}.` };
+  const migrated = migratePlannerDataExport(parsed, PLANNER_DATA_EXPORT_VERSION);
+
+  if (migrated.version !== PLANNER_DATA_EXPORT_VERSION) {
+    return { ok: false, error: `Unsupported import version: ${String(migrated.version)}.` };
   }
 
-  if (!isString(parsed.exportedAt)) {
+  if (!isString(migrated.exportedAt)) {
     return { ok: false, error: "Import file is missing export metadata." };
   }
 
-  if (!isPlannerPersistedData(parsed.data)) {
+  if (!isPlannerPersistedData(migrated.data)) {
     return { ok: false, error: "Import file does not contain valid planner data." };
   }
 
-  if (!isMealPersistedData(parsed.meals)) {
+  if (!isMealPersistedData(migrated.meals)) {
     return { ok: false, error: "Import file does not contain valid meal data." };
   }
 
-  if (!isWorkTrackerPersistedData(parsed.workTracker)) {
+  if (!isWorkTrackerPersistedData(migrated.workTracker)) {
     return { ok: false, error: "Import file does not contain valid work tracker data." };
   }
 
-  return { ok: true, data: parsed.data, meals: parsed.meals, workTracker: parsed.workTracker };
+  return { ok: true, data: migrated.data, meals: migrated.meals, workTracker: migrated.workTracker };
 }

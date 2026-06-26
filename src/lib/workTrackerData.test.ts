@@ -8,6 +8,7 @@ import {
   createEntry,
   createProject,
   isClientNameTaken,
+  isMalformedEmail,
   isProjectNameTaken,
   parseHourlyRateInput,
   pickNextProjectColor,
@@ -22,8 +23,8 @@ import {
 } from "./workTrackerData";
 import type { WorkClient, WorkEntriesByDate, WorkProject } from "../store/workTrackerStore.types";
 
-function makeClient(id: string, name: string): WorkClient {
-  return { id, name };
+function makeClient(id: string, name: string, contactName = "Jane Doe", contactEmail = "jane@example.com"): WorkClient {
+  return { id, name, contactName, contactEmail };
 }
 
 function makeProject(id: string, name: string, color: string, clientId: string, hourlyRate = 0): WorkProject {
@@ -32,9 +33,41 @@ function makeProject(id: string, name: string, color: string, clientId: string, 
 
 describe("createClient", () => {
   it("trims whitespace and generates a prefixed id", () => {
-    const client = createClient("  Acme  ");
+    const client = createClient("  Acme  ", "Jane Doe", "jane@acme.com");
     expect(client.name).toBe("Acme");
     expect(client.id).toMatch(/^client-/);
+  });
+
+  it("trims and stores the contact name/email", () => {
+    const client = createClient("Acme", "  Jane Doe  ", "  jane@acme.com  ");
+    expect(client.contactName).toBe("Jane Doe");
+    expect(client.contactEmail).toBe("jane@acme.com");
+  });
+
+  it("omits company when not provided", () => {
+    const client = createClient("Acme", "Jane Doe", "jane@acme.com");
+    expect(client.company).toBeUndefined();
+  });
+
+  it("trims and stores a provided company", () => {
+    const client = createClient("Acme", "Jane Doe", "jane@acme.com", "  Acme Corp  ");
+    expect(client.company).toBe("Acme Corp");
+  });
+});
+
+describe("isMalformedEmail", () => {
+  it("treats an empty string as not malformed (callers check emptiness separately)", () => {
+    expect(isMalformedEmail("")).toBe(false);
+    expect(isMalformedEmail("   ")).toBe(false);
+  });
+
+  it("accepts a plausible email address", () => {
+    expect(isMalformedEmail("jane@acme.com")).toBe(false);
+  });
+
+  it("rejects a string missing an @ or domain", () => {
+    expect(isMalformedEmail("jane")).toBe(true);
+    expect(isMalformedEmail("jane@acme")).toBe(true);
   });
 });
 
@@ -58,9 +91,21 @@ describe("updateClientInList / removeClientFromList", () => {
   const clients = [makeClient("c1", "Acme"), makeClient("c2", "Globex")];
 
   it("updates only the matching client", () => {
-    const updated = updateClientInList(clients, "c1", "Acme Corp");
-    expect(updated.find((c) => c.id === "c1")?.name).toBe("Acme Corp");
+    const updated = updateClientInList(clients, "c1", "Acme Corp", "John Smith", "john@acme.com");
+    expect(updated.find((c) => c.id === "c1")).toMatchObject({
+      name: "Acme Corp",
+      contactName: "John Smith",
+      contactEmail: "john@acme.com"
+    });
     expect(updated.find((c) => c.id === "c2")?.name).toBe("Globex");
+  });
+
+  it("sets and clears the company", () => {
+    const withCompany = updateClientInList(clients, "c1", "Acme", "Jane Doe", "jane@acme.com", "Acme Corp");
+    expect(withCompany.find((c) => c.id === "c1")?.company).toBe("Acme Corp");
+
+    const cleared = updateClientInList(withCompany, "c1", "Acme", "Jane Doe", "jane@acme.com");
+    expect(cleared.find((c) => c.id === "c1")?.company).toBeUndefined();
   });
 
   it("removes only the matching client", () => {

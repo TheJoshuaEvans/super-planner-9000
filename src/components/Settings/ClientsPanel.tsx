@@ -1,5 +1,10 @@
 import { useState, type FormEvent } from "react";
-import { countEntriesUsingProject, countProjectsUsingClient, isClientNameTaken } from "../../lib/workTrackerData";
+import {
+  countEntriesUsingProject,
+  countProjectsUsingClient,
+  isClientNameTaken,
+  isMalformedEmail
+} from "../../lib/workTrackerData";
 import { useConfirmDialogStore } from "../../store/confirmDialogStore";
 import { useWorkTrackerStore } from "../../store/workTrackerStore";
 import type { WorkClient } from "../../store/workTrackerStore";
@@ -37,9 +42,18 @@ function ClientsPanel() {
   const [mode, setMode] = useState<FormMode>("list");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formName, setFormName] = useState("");
+  const [formCompany, setFormCompany] = useState("");
+  const [formContactName, setFormContactName] = useState("");
+  const [formContactEmail, setFormContactEmail] = useState("");
 
   const nameTaken = isClientNameTaken(clients, formName, editingId ?? undefined);
-  const canSave = formName.trim().length > 0 && !nameTaken;
+  const emailMalformed = isMalformedEmail(formContactEmail);
+  const canSave =
+    formName.trim().length > 0 &&
+    !nameTaken &&
+    formContactName.trim().length > 0 &&
+    formContactEmail.trim().length > 0 &&
+    !emailMalformed;
 
   /**
    * Opens the add form with an empty label.
@@ -48,6 +62,9 @@ function ClientsPanel() {
     setMode("add");
     setEditingId(null);
     setFormName("");
+    setFormCompany("");
+    setFormContactName("");
+    setFormContactEmail("");
   }
 
   /**
@@ -59,6 +76,9 @@ function ClientsPanel() {
     setMode("edit");
     setEditingId(client.id);
     setFormName(client.name);
+    setFormCompany(client.company ?? "");
+    setFormContactName(client.contactName);
+    setFormContactEmail(client.contactEmail);
   }
 
   /**
@@ -68,6 +88,9 @@ function ClientsPanel() {
     setMode("list");
     setEditingId(null);
     setFormName("");
+    setFormCompany("");
+    setFormContactName("");
+    setFormContactEmail("");
   }
 
   /**
@@ -79,9 +102,9 @@ function ClientsPanel() {
     event.preventDefault();
     if (!canSave) return;
     if (mode === "add") {
-      addClient(formName);
+      addClient(formName, formContactName, formContactEmail, formCompany);
     } else if (mode === "edit" && editingId) {
-      updateClient(editingId, formName);
+      updateClient(editingId, formName, formContactName, formContactEmail, formCompany);
     }
     handleCancel();
   }
@@ -123,8 +146,8 @@ function ClientsPanel() {
         <div className="space-y-1">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-app-muted">Clients</h3>
           <p className="text-sm text-app-text">
-            Add, rename, or remove clients. Projects are scoped to a client, but client data isn't used by hour
-            tracking yet.
+            Add, rename, or remove clients. Every client needs a point of contact. Projects are scoped to a client,
+            but client data isn't used by hour tracking yet.
           </p>
         </div>
         {mode === "list" && (
@@ -139,18 +162,46 @@ function ClientsPanel() {
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-app-muted">
             {mode === "add" ? "New Client" : "Edit Client"}
           </p>
-          <div className="space-y-1">
+          <div className="flex flex-wrap gap-3">
+            <div className="min-w-[10rem] flex-1 space-y-1">
+              <input
+                type="text"
+                placeholder="Name"
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                autoFocus
+                className={inputClassName}
+              />
+              {nameTaken && formName.trim().length > 0 && (
+                <p className="text-xs text-red-400">A client with this name already exists.</p>
+              )}
+            </div>
             <input
               type="text"
-              placeholder="Name"
-              value={formName}
-              onChange={(e) => setFormName(e.target.value)}
-              autoFocus
-              className={inputClassName}
+              placeholder="Company (optional)"
+              value={formCompany}
+              onChange={(e) => setFormCompany(e.target.value)}
+              className={`min-w-[10rem] flex-1 ${inputClassName}`}
             />
-            {nameTaken && formName.trim().length > 0 && (
-              <p className="text-xs text-red-400">A client with this name already exists.</p>
-            )}
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <input
+              type="text"
+              placeholder="Contact name"
+              value={formContactName}
+              onChange={(e) => setFormContactName(e.target.value)}
+              className={`min-w-[10rem] flex-1 ${inputClassName}`}
+            />
+            <div className="min-w-[10rem] flex-1 space-y-1">
+              <input
+                type="email"
+                placeholder="Contact email"
+                value={formContactEmail}
+                onChange={(e) => setFormContactEmail(e.target.value)}
+                className={inputClassName}
+              />
+              {emailMalformed && <p className="text-xs text-red-400">Enter a valid email address.</p>}
+            </div>
           </div>
           <div className="flex gap-2">
             <button type="submit" disabled={!canSave} className={primaryButtonClassName}>
@@ -177,7 +228,15 @@ function ClientsPanel() {
                   isBeingEdited ? "border-app-accent/50 bg-app-panel" : "border-app-border bg-app-panel/60"
                 }`}
               >
-                <p className="truncate text-sm font-semibold text-app-text">{client.name}</p>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-app-text">
+                    {client.name}
+                    {client.company && <span className="font-normal text-app-muted"> · {client.company}</span>}
+                  </p>
+                  <p className="truncate text-xs text-app-muted">
+                    {client.contactName} · {client.contactEmail}
+                  </p>
+                </div>
                 {mode === "list" && (
                   <div className="flex shrink-0 gap-1">
                     <button type="button" onClick={() => handleStartEdit(client)} className={rowButtonClassName}>

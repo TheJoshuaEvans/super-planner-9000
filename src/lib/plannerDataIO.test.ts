@@ -33,14 +33,41 @@ const sampleMealData = {
   ]
 };
 
-const emptyWorkTrackerData = { clients: [], projects: [], entriesByDate: {} };
+const emptyUserContactInfo = {
+  name: "",
+  email: "",
+  phone: "",
+  addressLine1: "",
+  addressLine2: "",
+  city: "",
+  state: "",
+  postalCode: "",
+  country: ""
+};
+
+const sampleUserContactInfo = {
+  name: "Jane Smith",
+  email: "jane@example.com",
+  phone: "555-1234",
+  addressLine1: "1 Main St",
+  addressLine2: "Suite 2",
+  city: "Springfield",
+  state: "IL",
+  postalCode: "62701",
+  country: "USA"
+};
+
+const emptyWorkTrackerData = { clients: [], projects: [], entriesByDate: {}, userContactInfo: emptyUserContactInfo };
 
 const sampleWorkTrackerData = {
-  clients: [{ id: "client-1", name: "Acme Co" }],
+  clients: [
+    { id: "client-1", name: "Acme Co", contactName: "Jane Doe", contactEmail: "jane@acme.com", company: "Acme Corporation" }
+  ],
   projects: [{ id: "project-1", name: "Website", color: "#E69F00", clientId: "client-1", hourlyRate: 45 }],
   entriesByDate: {
     "2026-06-09": [{ id: "entry-1", projectId: "project-1", hours: 4 }]
-  }
+  },
+  userContactInfo: sampleUserContactInfo
 };
 
 describe("plannerDataIO", () => {
@@ -67,7 +94,7 @@ describe("plannerDataIO", () => {
     );
 
     expect(text).toContain("\n  \"app\": \"super-planner-9000\",");
-    expect(text).toContain("\n  \"version\": 5,");
+    expect(text).toContain("\n  \"version\": 7,");
     expect(text).toContain("\n  \"data\": {");
     expect(text).toContain("\n  \"meals\": {");
     expect(text).toContain("\n  \"workTracker\": {");
@@ -128,6 +155,74 @@ describe("plannerDataIO", () => {
     const result = parsePlannerDataImport(payload);
 
     expect(result).toEqual({ ok: true, data: samplePlannerData, meals: emptyMeals, workTracker: emptyWorkTrackerData });
+  });
+
+  it("migrates a v6 export up to the current version on import, without losing existing data", () => {
+    const v6Payload = JSON.stringify({
+      app: PLANNER_DATA_EXPORT_APP,
+      version: 6,
+      exportedAt: "2026-06-09T12:34:56.000Z",
+      data: samplePlannerData,
+      meals: sampleMealData,
+      workTracker: {
+        clients: sampleWorkTrackerData.clients,
+        projects: sampleWorkTrackerData.projects,
+        entriesByDate: sampleWorkTrackerData.entriesByDate
+      }
+    });
+
+    const result = parsePlannerDataImport(v6Payload);
+
+    expect(result).toEqual({
+      ok: true,
+      data: samplePlannerData,
+      meals: sampleMealData,
+      workTracker: { ...sampleWorkTrackerData, userContactInfo: emptyUserContactInfo }
+    });
+  });
+
+  it("migrates a v5 export (client missing contactName/contactEmail) all the way to the current version", () => {
+    const v5Payload = JSON.stringify({
+      app: PLANNER_DATA_EXPORT_APP,
+      version: 5,
+      exportedAt: "2026-06-09T12:34:56.000Z",
+      data: samplePlannerData,
+      meals: sampleMealData,
+      workTracker: {
+        clients: [{ id: "client-1", name: "Acme Co" }],
+        projects: sampleWorkTrackerData.projects,
+        entriesByDate: sampleWorkTrackerData.entriesByDate
+      }
+    });
+
+    const result = parsePlannerDataImport(v5Payload);
+
+    expect(result).toEqual({
+      ok: true,
+      data: samplePlannerData,
+      meals: sampleMealData,
+      workTracker: {
+        clients: [{ id: "client-1", name: "Acme Co", contactName: "", contactEmail: "" }],
+        projects: sampleWorkTrackerData.projects,
+        entriesByDate: sampleWorkTrackerData.entriesByDate,
+        userContactInfo: emptyUserContactInfo
+      }
+    });
+  });
+
+  it("rejects a version with no registered migration path", () => {
+    const result = parsePlannerDataImport(
+      JSON.stringify({
+        app: PLANNER_DATA_EXPORT_APP,
+        version: 4,
+        exportedAt: "2026-06-09T12:34:56.000Z",
+        data: samplePlannerData,
+        meals: sampleMealData,
+        workTracker: { clients: [], projects: [], entriesByDate: {} }
+      })
+    );
+
+    expect(result).toEqual({ ok: false, error: "Unsupported import version: 4." });
   });
 
   it("rejects unsupported versions before validating the payload", () => {
@@ -261,6 +356,182 @@ describe("plannerDataIO", () => {
     expect(result).toEqual({ ok: false, error: "Import file does not contain valid work tracker data." });
   });
 
+  it("round-trips a client's contact name/email", () => {
+    const workTrackerWithContact = {
+      clients: [{ id: "client-1", name: "Acme Co", contactName: "Jane Doe", contactEmail: "jane@acme.com" }],
+      projects: [],
+      entriesByDate: {},
+      userContactInfo: emptyUserContactInfo
+    };
+
+    const envelope = createPlannerDataExportEnvelope(
+      samplePlannerData,
+      sampleMealData,
+      workTrackerWithContact,
+      new Date("2026-06-09T12:34:56.000Z")
+    );
+
+    expect(envelope.workTracker.clients[0]).toEqual(workTrackerWithContact.clients[0]);
+
+    const result = parsePlannerDataImport(JSON.stringify(envelope));
+    expect(result).toEqual({ ok: true, data: samplePlannerData, meals: sampleMealData, workTracker: workTrackerWithContact });
+  });
+
+  it("rejects a client with a non-string contact name", () => {
+    const result = parsePlannerDataImport(
+      JSON.stringify({
+        app: PLANNER_DATA_EXPORT_APP,
+        version: PLANNER_DATA_EXPORT_VERSION,
+        exportedAt: "2026-06-09T12:34:56.000Z",
+        data: { categories: [], segmentsByDate: {} },
+        meals: { components: [], meals: [] },
+        workTracker: {
+          clients: [{ id: "client-1", name: "Acme Co", contactName: 42, contactEmail: "jane@acme.com" }],
+          projects: [],
+          entriesByDate: {}
+        }
+      })
+    );
+
+    expect(result).toEqual({ ok: false, error: "Import file does not contain valid work tracker data." });
+  });
+
+  it("rejects a client missing a contactEmail", () => {
+    const result = parsePlannerDataImport(
+      JSON.stringify({
+        app: PLANNER_DATA_EXPORT_APP,
+        version: PLANNER_DATA_EXPORT_VERSION,
+        exportedAt: "2026-06-09T12:34:56.000Z",
+        data: { categories: [], segmentsByDate: {} },
+        meals: { components: [], meals: [] },
+        workTracker: {
+          clients: [{ id: "client-1", name: "Acme Co", contactName: "Jane Doe" }],
+          projects: [],
+          entriesByDate: {}
+        }
+      })
+    );
+
+    expect(result).toEqual({ ok: false, error: "Import file does not contain valid work tracker data." });
+  });
+
+  it("round-trips a client's optional company", () => {
+    const workTrackerWithCompany = {
+      clients: [
+        { id: "client-1", name: "Acme Co", contactName: "Jane Doe", contactEmail: "jane@acme.com", company: "Acme Corporation" }
+      ],
+      projects: [],
+      entriesByDate: {},
+      userContactInfo: emptyUserContactInfo
+    };
+
+    const envelope = createPlannerDataExportEnvelope(
+      samplePlannerData,
+      sampleMealData,
+      workTrackerWithCompany,
+      new Date("2026-06-09T12:34:56.000Z")
+    );
+
+    expect(envelope.workTracker.clients[0]).toEqual(workTrackerWithCompany.clients[0]);
+
+    const result = parsePlannerDataImport(JSON.stringify(envelope));
+    expect(result).toEqual({ ok: true, data: samplePlannerData, meals: sampleMealData, workTracker: workTrackerWithCompany });
+  });
+
+  it("omits company from normalized export when not provided", () => {
+    const workTrackerWithoutCompany = {
+      clients: [{ id: "client-1", name: "Acme Co", contactName: "Jane Doe", contactEmail: "jane@acme.com" }],
+      projects: [],
+      entriesByDate: {},
+      userContactInfo: emptyUserContactInfo
+    };
+
+    const envelope = createPlannerDataExportEnvelope(
+      samplePlannerData,
+      sampleMealData,
+      workTrackerWithoutCompany,
+      new Date("2026-06-09T12:34:56.000Z")
+    );
+
+    expect(envelope.workTracker.clients[0]).not.toHaveProperty("company");
+  });
+
+  it("rejects a client with a non-string company", () => {
+    const result = parsePlannerDataImport(
+      JSON.stringify({
+        app: PLANNER_DATA_EXPORT_APP,
+        version: PLANNER_DATA_EXPORT_VERSION,
+        exportedAt: "2026-06-09T12:34:56.000Z",
+        data: { categories: [], segmentsByDate: {} },
+        meals: { components: [], meals: [] },
+        workTracker: {
+          clients: [{ id: "client-1", name: "Acme Co", contactName: "Jane Doe", contactEmail: "jane@acme.com", company: 42 }],
+          projects: [],
+          entriesByDate: {},
+          userContactInfo: emptyUserContactInfo
+        }
+      })
+    );
+
+    expect(result).toEqual({ ok: false, error: "Import file does not contain valid work tracker data." });
+  });
+
+  it("rejects a payload missing userContactInfo", () => {
+    const result = parsePlannerDataImport(
+      JSON.stringify({
+        app: PLANNER_DATA_EXPORT_APP,
+        version: PLANNER_DATA_EXPORT_VERSION,
+        exportedAt: "2026-06-09T12:34:56.000Z",
+        data: { categories: [], segmentsByDate: {} },
+        meals: { components: [], meals: [] },
+        workTracker: { clients: [], projects: [], entriesByDate: {} }
+      })
+    );
+
+    expect(result).toEqual({ ok: false, error: "Import file does not contain valid work tracker data." });
+  });
+
+  it("rejects userContactInfo with a non-string field", () => {
+    const result = parsePlannerDataImport(
+      JSON.stringify({
+        app: PLANNER_DATA_EXPORT_APP,
+        version: PLANNER_DATA_EXPORT_VERSION,
+        exportedAt: "2026-06-09T12:34:56.000Z",
+        data: { categories: [], segmentsByDate: {} },
+        meals: { components: [], meals: [] },
+        workTracker: {
+          clients: [],
+          projects: [],
+          entriesByDate: {},
+          userContactInfo: { ...emptyUserContactInfo, name: "Jane Doe", email: "jane@example.com", phone: 5551234 }
+        }
+      })
+    );
+
+    expect(result).toEqual({ ok: false, error: "Import file does not contain valid work tracker data." });
+  });
+
+  it("round-trips the user's own contact info", () => {
+    const workTrackerWithUser = {
+      clients: [],
+      projects: [],
+      entriesByDate: {},
+      userContactInfo: sampleUserContactInfo
+    };
+
+    const envelope = createPlannerDataExportEnvelope(
+      samplePlannerData,
+      sampleMealData,
+      workTrackerWithUser,
+      new Date("2026-06-09T12:34:56.000Z")
+    );
+
+    expect(envelope.workTracker.userContactInfo).toEqual(workTrackerWithUser.userContactInfo);
+
+    const result = parsePlannerDataImport(JSON.stringify(envelope));
+    expect(result).toEqual({ ok: true, data: samplePlannerData, meals: sampleMealData, workTracker: workTrackerWithUser });
+  });
+
   it("rejects an entry with negative hours", () => {
     const result = parsePlannerDataImport(
       JSON.stringify({
@@ -290,7 +561,8 @@ describe("plannerDataIO", () => {
       workTracker: {
         clients: [],
         projects: [],
-        entriesByDate: { "2026-06-09": [{ id: "entry-1", projectId: "missing-project", hours: 4 }] }
+        entriesByDate: { "2026-06-09": [{ id: "entry-1", projectId: "missing-project", hours: 4 }] },
+        userContactInfo: emptyUserContactInfo
       }
     });
 

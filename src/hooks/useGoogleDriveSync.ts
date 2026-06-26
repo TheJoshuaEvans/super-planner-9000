@@ -66,7 +66,8 @@ export function useGoogleDriveSync(): UseGoogleDriveSyncResult {
       {
         clients: workTrackerState.clients,
         projects: workTrackerState.projects,
-        entriesByDate: workTrackerState.entriesByDate
+        entriesByDate: workTrackerState.entriesByDate,
+        userContactInfo: workTrackerState.userContactInfo
       }
     );
 
