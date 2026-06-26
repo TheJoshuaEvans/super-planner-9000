@@ -120,6 +120,27 @@ describe("plannerDataIO", () => {
     expect(envelope.data).not.toHaveProperty("history");
   });
 
+  it("tolerates a live client missing contactName/contactEmail entirely when normalizing for export", () => {
+    // Regression: clients persisted before these fields existed never got migrated in the live
+    // Zustand store (migrations only run on JSON import), so they can reach normalization with
+    // contactName/contactEmail genuinely absent rather than empty strings.
+    const legacyWorkTrackerData = {
+      clients: [{ id: "client-1", name: "Acme Co" }],
+      projects: [],
+      entriesByDate: {},
+      userContactInfo: emptyUserContactInfo
+    } as unknown as typeof sampleWorkTrackerData;
+
+    const envelope = createPlannerDataExportEnvelope(
+      samplePlannerData,
+      sampleMealData,
+      legacyWorkTrackerData,
+      new Date("2026-06-09T12:34:56.000Z")
+    );
+
+    expect(envelope.workTracker.clients[0]).toEqual({ id: "client-1", name: "Acme Co", contactName: "", contactEmail: "" });
+  });
+
   it("builds a predictable export filename", () => {
     const filename = buildPlannerExportFilename(new Date("2026-06-09T12:34:56.000Z"));
 

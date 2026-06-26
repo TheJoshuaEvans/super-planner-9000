@@ -361,8 +361,8 @@ function normalizeWorkTrackerPersistedData(workTracker: WorkTrackerPersistedData
     clients: workTracker.clients.map((client) => ({
       id: client.id,
       name: client.name,
-      contactName: client.contactName,
-      contactEmail: client.contactEmail,
+      contactName: client.contactName ?? "",
+      contactEmail: client.contactEmail ?? "",
       ...(client.company ? { company: client.company } : {})
     })),
     projects: workTracker.projects.map((project) => ({

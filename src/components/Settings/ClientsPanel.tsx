@@ -77,8 +77,8 @@ function ClientsPanel() {
     setEditingId(client.id);
     setFormName(client.name);
     setFormCompany(client.company ?? "");
-    setFormContactName(client.contactName);
-    setFormContactEmail(client.contactEmail);
+    setFormContactName(client.contactName ?? "");
+    setFormContactEmail(client.contactEmail ?? "");
   }
 
   /**
@@ -234,7 +234,7 @@ function ClientsPanel() {
                     {client.company && <span className="font-normal text-app-muted"> · {client.company}</span>}
                   </p>
                   <p className="truncate text-xs text-app-muted">
-                    {client.contactName} · {client.contactEmail}
+                    {client.contactName ?? ""} · {client.contactEmail ?? ""}
                   </p>
                 </div>
                 {mode === "list" && (
