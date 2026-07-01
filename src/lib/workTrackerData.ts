@@ -1,6 +1,9 @@
 import { COLORBLIND_SAFE_PALETTE } from "./colorPalette";
 import type { UserContactInfo, WorkClient, WorkEntriesByDate, WorkEntry, WorkProject } from "../store/workTrackerStore.types";
 
+/** Default payment terms (in days) suggested for a new client: "Net 30", the common business default. */
+export const DEFAULT_PAYMENT_TERMS_DAYS = 30;
+
 /** Default blank value for the user's own contact info, before they've filled anything in. */
 export const BLANK_USER_CONTACT_INFO: UserContactInfo = {
   name: "",
@@ -24,21 +27,35 @@ function createId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** Pattern a client code must match: exactly 3 letters and/or digits. */
+const CLIENT_CODE_PATTERN = /^[A-Z0-9]{3}$/;
+
 /**
  * Creates a new WorkClient with a generated id.
  *
  * @param name - Display name for the client.
  * @param contactName - Point-of-contact name.
  * @param contactEmail - Point-of-contact email address.
+ * @param clientCode - Unique 3-character (letters/digits) code used on invoice numbers.
+ * @param paymentTerms - Number of days after invoice submission before payment is due.
  * @param company - Optional company/organization name.
  * @returns A new WorkClient.
  */
-export function createClient(name: string, contactName: string, contactEmail: string, company = ""): WorkClient {
+export function createClient(
+  name: string,
+  contactName: string,
+  contactEmail: string,
+  clientCode: string,
+  paymentTerms: number,
+  company = ""
+): WorkClient {
   return {
     id: createId("client"),
     name: name.trim(),
     contactName: contactName.trim(),
     contactEmail: contactEmail.trim(),
+    clientCode: clientCode.trim().toUpperCase(),
+    paymentTerms,
     company: company.trim() || undefined
   };
 }
@@ -69,13 +86,40 @@ export function isMalformedEmail(email: string): boolean {
 }
 
 /**
- * Returns a new list with the target client's name, contact name, contact email, and company updated.
+ * Returns true if the given code is exactly 3 letters/digits once trimmed and uppercased.
+ *
+ * @param code - Candidate client code.
+ * @returns Whether the code matches the required client-code format.
+ */
+export function isValidClientCode(code: string): boolean {
+  return CLIENT_CODE_PATTERN.test(code.trim().toUpperCase());
+}
+
+/**
+ * Returns true if any client other than the one being edited already uses the given code
+ * (case-insensitive).
+ *
+ * @param clients - Existing client list to check against.
+ * @param code - Code to test for a conflict.
+ * @param excludeId - Id of the client being edited, if any, so it is not matched against itself.
+ * @returns Whether the code is already taken by another client.
+ */
+export function isClientCodeTaken(clients: WorkClient[], code: string, excludeId?: string): boolean {
+  const normalized = code.trim().toUpperCase();
+  return clients.some((client) => client.id !== excludeId && (client.clientCode ?? "").toUpperCase() === normalized);
+}
+
+/**
+ * Returns a new list with the target client's name, contact name, contact email, client code,
+ * payment terms, and company updated.
  *
  * @param clients - Existing client list.
  * @param id - Id of the client to update.
  * @param name - New name value.
  * @param contactName - New point-of-contact name.
  * @param contactEmail - New point-of-contact email address.
+ * @param clientCode - New unique 3-character client code.
+ * @param paymentTerms - New number of days after invoice submission before payment is due.
  * @param company - New company/organization name (empty string clears it).
  * @returns Updated client list.
  */
@@ -85,6 +129,8 @@ export function updateClientInList(
   name: string,
   contactName: string,
   contactEmail: string,
+  clientCode: string,
+  paymentTerms: number,
   company = ""
 ): WorkClient[] {
   return clients.map((client) =>
@@ -94,6 +140,8 @@ export function updateClientInList(
           name: name.trim(),
           contactName: contactName.trim(),
           contactEmail: contactEmail.trim(),
+          clientCode: clientCode.trim().toUpperCase(),
+          paymentTerms,
           company: company.trim() || undefined
         }
       : client
@@ -167,6 +215,28 @@ export function parseHourlyRateInput(raw: string): number | null {
   }
 
   return Math.round(value * 100) / 100;
+}
+
+/**
+ * Parses a raw payment-terms input string into a normalized non-negative integer day count.
+ *
+ * @param raw - Raw text from a numeric payment-terms input.
+ * @returns A non-negative integer, or null if not a valid non-negative whole number.
+ */
+export function parsePaymentTermsInput(raw: string): number | null {
+  const trimmed = raw.trim();
+
+  if (trimmed === "") {
+    return null;
+  }
+
+  const value = Number(trimmed);
+
+  if (!Number.isInteger(value) || value < 0) {
+    return null;
+  }
+
+  return value;
 }
 
 /**

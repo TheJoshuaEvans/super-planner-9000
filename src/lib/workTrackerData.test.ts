@@ -7,10 +7,13 @@ import {
   createClient,
   createEntry,
   createProject,
+  isClientCodeTaken,
   isClientNameTaken,
   isMalformedEmail,
   isProjectNameTaken,
+  isValidClientCode,
   parseHourlyRateInput,
+  parsePaymentTermsInput,
   pickNextProjectColor,
   removeClientFromList,
   removeEntriesForProject,
@@ -23,8 +26,15 @@ import {
 } from "./workTrackerData";
 import type { WorkClient, WorkEntriesByDate, WorkProject } from "../store/workTrackerStore.types";
 
-function makeClient(id: string, name: string, contactName = "Jane Doe", contactEmail = "jane@example.com"): WorkClient {
-  return { id, name, contactName, contactEmail };
+function makeClient(
+  id: string,
+  name: string,
+  contactName = "Jane Doe",
+  contactEmail = "jane@example.com",
+  clientCode = "ABC",
+  paymentTerms = 30
+): WorkClient {
+  return { id, name, contactName, contactEmail, clientCode, paymentTerms };
 }
 
 function makeProject(id: string, name: string, color: string, clientId: string, hourlyRate = 0): WorkProject {
@@ -33,25 +43,85 @@ function makeProject(id: string, name: string, color: string, clientId: string, 
 
 describe("createClient", () => {
   it("trims whitespace and generates a prefixed id", () => {
-    const client = createClient("  Acme  ", "Jane Doe", "jane@acme.com");
+    const client = createClient("  Acme  ", "Jane Doe", "jane@acme.com", "ABC", 30);
     expect(client.name).toBe("Acme");
     expect(client.id).toMatch(/^client-/);
   });
 
   it("trims and stores the contact name/email", () => {
-    const client = createClient("Acme", "  Jane Doe  ", "  jane@acme.com  ");
+    const client = createClient("Acme", "  Jane Doe  ", "  jane@acme.com  ", "ABC", 30);
     expect(client.contactName).toBe("Jane Doe");
     expect(client.contactEmail).toBe("jane@acme.com");
   });
 
+  it("trims and uppercases the client code", () => {
+    const client = createClient("Acme", "Jane Doe", "jane@acme.com", "  ab1  ", 30);
+    expect(client.clientCode).toBe("AB1");
+  });
+
+  it("stores the payment terms", () => {
+    const client = createClient("Acme", "Jane Doe", "jane@acme.com", "ABC", 14);
+    expect(client.paymentTerms).toBe(14);
+  });
+
   it("omits company when not provided", () => {
-    const client = createClient("Acme", "Jane Doe", "jane@acme.com");
+    const client = createClient("Acme", "Jane Doe", "jane@acme.com", "ABC", 30);
     expect(client.company).toBeUndefined();
   });
 
   it("trims and stores a provided company", () => {
-    const client = createClient("Acme", "Jane Doe", "jane@acme.com", "  Acme Corp  ");
+    const client = createClient("Acme", "Jane Doe", "jane@acme.com", "ABC", 30, "  Acme Corp  ");
     expect(client.company).toBe("Acme Corp");
+  });
+});
+
+describe("isValidClientCode", () => {
+  it("accepts exactly 3 letters and/or digits, case-insensitively", () => {
+    expect(isValidClientCode("ABC")).toBe(true);
+    expect(isValidClientCode("abc")).toBe(true);
+    expect(isValidClientCode("AB1")).toBe(true);
+    expect(isValidClientCode("007")).toBe(true);
+  });
+
+  it("rejects codes that aren't exactly 3 characters", () => {
+    expect(isValidClientCode("AB")).toBe(false);
+    expect(isValidClientCode("ABCD")).toBe(false);
+    expect(isValidClientCode("")).toBe(false);
+  });
+
+  it("rejects non-alphanumeric characters", () => {
+    expect(isValidClientCode("A-B")).toBe(false);
+    expect(isValidClientCode("A B")).toBe(false);
+  });
+
+  it("trims surrounding whitespace before validating", () => {
+    expect(isValidClientCode("  ABC  ")).toBe(true);
+  });
+});
+
+describe("isClientCodeTaken", () => {
+  const clients = [makeClient("c1", "Acme", "Jane Doe", "jane@example.com", "ABC")];
+
+  it("is case-insensitive", () => {
+    expect(isClientCodeTaken(clients, "abc")).toBe(true);
+  });
+
+  it("excludes the id being edited", () => {
+    expect(isClientCodeTaken(clients, "ABC", "c1")).toBe(false);
+  });
+
+  it("returns false for an unused code", () => {
+    expect(isClientCodeTaken(clients, "XYZ")).toBe(false);
+  });
+
+  it("tolerates a legacy client missing clientCode entirely, without crashing", () => {
+    // Regression: clients persisted before this field existed never get migrated in the live
+    // Zustand store (migrations only run on JSON import), so they can reach this check with
+    // clientCode genuinely absent rather than an empty string.
+    const legacyClients = [{ id: "c9", name: "Legacy Co" }] as WorkClient[];
+
+    expect(() => isClientCodeTaken(legacyClients, "ABC")).not.toThrow();
+    expect(isClientCodeTaken(legacyClients, "ABC")).toBe(false);
   });
 });
 
@@ -91,7 +161,7 @@ describe("updateClientInList / removeClientFromList", () => {
   const clients = [makeClient("c1", "Acme"), makeClient("c2", "Globex")];
 
   it("updates only the matching client", () => {
-    const updated = updateClientInList(clients, "c1", "Acme Corp", "John Smith", "john@acme.com");
+    const updated = updateClientInList(clients, "c1", "Acme Corp", "John Smith", "john@acme.com", "ABC", 30);
     expect(updated.find((c) => c.id === "c1")).toMatchObject({
       name: "Acme Corp",
       contactName: "John Smith",
@@ -100,11 +170,21 @@ describe("updateClientInList / removeClientFromList", () => {
     expect(updated.find((c) => c.id === "c2")?.name).toBe("Globex");
   });
 
+  it("trims and uppercases the updated client code", () => {
+    const updated = updateClientInList(clients, "c1", "Acme", "Jane Doe", "jane@acme.com", "  xy2  ", 30);
+    expect(updated.find((c) => c.id === "c1")?.clientCode).toBe("XY2");
+  });
+
+  it("updates the payment terms", () => {
+    const updated = updateClientInList(clients, "c1", "Acme", "Jane Doe", "jane@acme.com", "ABC", 14);
+    expect(updated.find((c) => c.id === "c1")?.paymentTerms).toBe(14);
+  });
+
   it("sets and clears the company", () => {
-    const withCompany = updateClientInList(clients, "c1", "Acme", "Jane Doe", "jane@acme.com", "Acme Corp");
+    const withCompany = updateClientInList(clients, "c1", "Acme", "Jane Doe", "jane@acme.com", "ABC", 30, "Acme Corp");
     expect(withCompany.find((c) => c.id === "c1")?.company).toBe("Acme Corp");
 
-    const cleared = updateClientInList(withCompany, "c1", "Acme", "Jane Doe", "jane@acme.com");
+    const cleared = updateClientInList(withCompany, "c1", "Acme", "Jane Doe", "jane@acme.com", "ABC", 30);
     expect(cleared.find((c) => c.id === "c1")?.company).toBeUndefined();
   });
 
@@ -179,6 +259,24 @@ describe("parseHourlyRateInput", () => {
     expect(parseHourlyRateInput("  ")).toBeNull();
     expect(parseHourlyRateInput("-5")).toBeNull();
     expect(parseHourlyRateInput("abc")).toBeNull();
+  });
+});
+
+describe("parsePaymentTermsInput", () => {
+  it("parses a valid non-negative integer", () => {
+    expect(parsePaymentTermsInput("30")).toBe(30);
+  });
+
+  it("allows zero", () => {
+    expect(parsePaymentTermsInput("0")).toBe(0);
+  });
+
+  it("returns null for empty, negative, fractional, or non-numeric input", () => {
+    expect(parsePaymentTermsInput("")).toBeNull();
+    expect(parsePaymentTermsInput("  ")).toBeNull();
+    expect(parsePaymentTermsInput("-5")).toBeNull();
+    expect(parsePaymentTermsInput("14.5")).toBeNull();
+    expect(parsePaymentTermsInput("abc")).toBeNull();
   });
 });
 

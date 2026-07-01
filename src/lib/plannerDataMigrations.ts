@@ -19,6 +19,45 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** Pattern a client code must match: exactly 3 letters and/or digits. Duplicated from workTrackerData.ts for the same isolation reason as `isRecord`. */
+const CLIENT_CODE_PATTERN = /^[A-Z0-9]{3}$/;
+
+/**
+ * Returns a new clients array where any client missing a valid 3-character `clientCode` gets a
+ * deterministic, collision-free placeholder (`"C01"`, `"C02"`, ...), skipping any candidate that
+ * collides with a code a client already has. Clients that already have a valid code are
+ * untouched, so this is safe to run repeatedly.
+ *
+ * @param clients - Raw client records from a v7 (or earlier) export.
+ * @returns The same clients, with placeholder codes backfilled where needed.
+ */
+function backfillClientCodes(clients: unknown[]): unknown[] {
+  const usedCodes = new Set<string>();
+
+  for (const client of clients) {
+    if (isRecord(client) && typeof client.clientCode === "string" && CLIENT_CODE_PATTERN.test(client.clientCode)) {
+      usedCodes.add(client.clientCode);
+    }
+  }
+
+  let fallbackCounter = 1;
+
+  return clients.map((client) => {
+    if (!isRecord(client) || (typeof client.clientCode === "string" && CLIENT_CODE_PATTERN.test(client.clientCode))) {
+      return client;
+    }
+
+    let candidate: string;
+    do {
+      candidate = `C${String(fallbackCounter).padStart(2, "0")}`;
+      fallbackCounter++;
+    } while (usedCodes.has(candidate));
+
+    usedCodes.add(candidate);
+    return { ...client, clientCode: candidate };
+  });
+}
+
 /**
  * Registered upgrade steps for the planner data export envelope, one per version bump that needs
  * to backfill or reshape data. Add a new entry here whenever `PLANNER_DATA_EXPORT_VERSION` is
@@ -79,6 +118,58 @@ export const PLANNER_DATA_MIGRATIONS: PlannerDataMigrationStep[] = [
         }
       }
     })
+  },
+  {
+    // v7 -> v8: WorkClient gained a required, unique `clientCode` (3 letters/digits, used to
+    // build invoice numbers), and WorkTrackerPersistedData gained a required
+    // `invoiceSequenceByPeriod` map tracking the last-used invoice index per client/month.
+    // Backfill placeholder client codes (deterministic, collision-free within this one client
+    // list) and start the invoice sequence blank — there's no history to recover, since no
+    // invoices were tracked before this feature existed, so future ones for migrated clients
+    // simply start at index 1 per period.
+    fromVersion: 7,
+    migrate: (raw) => {
+      const workTracker = isRecord(raw.workTracker) ? raw.workTracker : {};
+      const clients = Array.isArray(workTracker.clients) ? workTracker.clients : [];
+
+      return {
+        ...raw,
+        version: 8,
+        workTracker: {
+          ...workTracker,
+          clients: backfillClientCodes(clients),
+          invoiceSequenceByPeriod: {}
+        }
+      };
+    }
+  },
+  {
+    // v8 -> v9: WorkClient gained a required `paymentTerms` (days after invoice submission
+    // before payment is due, used to compute each invoice's due date). Backfill 30 ("Net 30", a
+    // standard business default) for any client missing a valid non-negative number; preserve
+    // any value that's already valid.
+    fromVersion: 8,
+    migrate: (raw) => {
+      const workTracker = isRecord(raw.workTracker) ? raw.workTracker : {};
+      const clients = Array.isArray(workTracker.clients) ? workTracker.clients : [];
+
+      return {
+        ...raw,
+        version: 9,
+        workTracker: {
+          ...workTracker,
+          clients: clients.map((client) =>
+            isRecord(client)
+              ? {
+                  ...client,
+                  paymentTerms:
+                    typeof client.paymentTerms === "number" && client.paymentTerms >= 0 ? client.paymentTerms : 30
+                }
+              : client
+          )
+        }
+      };
+    }
   }
 ];
 

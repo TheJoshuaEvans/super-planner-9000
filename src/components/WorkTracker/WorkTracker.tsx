@@ -43,7 +43,7 @@ function WorkTracker() {
     <section className={`flex flex-1 flex-col gap-5 ${selectedDateKey ? "pb-64 lg:pb-72" : ""}`}>
       <WorkHoursChart data={chartData} projects={projects} />
 
-      <InvoiceOverview overview={invoiceOverview} monthLabel={monthLabel} />
+      <InvoiceOverview overview={invoiceOverview} monthLabel={monthLabel} visibleMonth={visibleMonth} />
 
       <WorkTrackerCalendar
         visibleMonth={visibleMonth}

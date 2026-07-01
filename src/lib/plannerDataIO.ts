@@ -1,8 +1,10 @@
 import { migratePlannerDataExport } from "./plannerDataMigrations";
 import { TOTAL_DAY_SLOTS } from "./timeline";
+import { DEFAULT_PAYMENT_TERMS_DAYS } from "./workTrackerData";
 import type { PlannerCategory, PlannerPersistedData, PlannerSegment, PlannerSegmentsByDate } from "../store/plannerStore";
 import type { Meal, MealComponent, MealIngredient, MealPersistedData } from "../store/mealStore.types";
 import type {
+  InvoiceSequenceByPeriod,
   UserContactInfo,
   WorkClient,
   WorkEntriesByDate,
@@ -12,7 +14,7 @@ import type {
 } from "../store/workTrackerStore.types";
 
 export const PLANNER_DATA_EXPORT_APP = "super-planner-9000" as const;
-export const PLANNER_DATA_EXPORT_VERSION = 7 as const;
+export const PLANNER_DATA_EXPORT_VERSION = 9 as const;
 
 export type PlannerDataExportEnvelope = {
   app: typeof PLANNER_DATA_EXPORT_APP;
@@ -186,8 +188,8 @@ function isMealPersistedData(value: unknown): value is MealPersistedData {
 }
 
 /**
- * Validates a single work client shape, including its required contact name/email fields and
- * optional company name.
+ * Validates a single work client shape, including its required contact name/email/client-code/
+ * payment-terms fields and optional company name.
  *
  * @param value - Unknown candidate client.
  * @returns Whether the value matches WorkClient fields.
@@ -199,6 +201,9 @@ function isWorkClient(value: unknown): value is WorkClient {
     isString(value.name) &&
     isString(value.contactName) &&
     isString(value.contactEmail) &&
+    isString(value.clientCode) &&
+    isNumber(value.paymentTerms) &&
+    value.paymentTerms >= 0 &&
     (value.company === undefined || isString(value.company))
   );
 }
@@ -275,12 +280,22 @@ function isUserContactInfo(value: unknown): value is UserContactInfo {
 }
 
 /**
+ * Validates the persisted invoice-sequence map shape: a plain object whose every value is a number.
+ *
+ * @param value - Unknown candidate sequence map.
+ * @returns Whether the value matches InvoiceSequenceByPeriod.
+ */
+function isInvoiceSequenceByPeriod(value: unknown): value is InvoiceSequenceByPeriod {
+  return isPlainObject(value) && Object.values(value).every((entry) => isNumber(entry));
+}
+
+/**
  * Validates the persisted work tracker payload shape. Does not check that a project's clientId
  * or an entry's projectId resolves to an existing record, matching the same referential leniency
  * already used for segment categoryId and meal ingredient componentId references.
  *
  * @param value - Unknown candidate persisted payload.
- * @returns Whether clients, projects, per-date entries, and the user's contact info are valid.
+ * @returns Whether clients, projects, per-date entries, contact info, and the invoice sequence are valid.
  */
 function isWorkTrackerPersistedData(value: unknown): value is WorkTrackerPersistedData {
   return (
@@ -290,7 +305,8 @@ function isWorkTrackerPersistedData(value: unknown): value is WorkTrackerPersist
     Array.isArray(value.projects) &&
     value.projects.every((project) => isWorkProject(project)) &&
     isWorkEntriesByDate(value.entriesByDate) &&
-    isUserContactInfo(value.userContactInfo)
+    isUserContactInfo(value.userContactInfo) &&
+    isInvoiceSequenceByPeriod(value.invoiceSequenceByPeriod)
   );
 }
 
@@ -363,6 +379,8 @@ function normalizeWorkTrackerPersistedData(workTracker: WorkTrackerPersistedData
       name: client.name,
       contactName: client.contactName ?? "",
       contactEmail: client.contactEmail ?? "",
+      clientCode: client.clientCode ?? "",
+      paymentTerms: client.paymentTerms ?? DEFAULT_PAYMENT_TERMS_DAYS,
       ...(client.company ? { company: client.company } : {})
     })),
     projects: workTracker.projects.map((project) => ({
@@ -388,7 +406,8 @@ function normalizeWorkTrackerPersistedData(workTracker: WorkTrackerPersistedData
       state: workTracker.userContactInfo.state,
       postalCode: workTracker.userContactInfo.postalCode,
       country: workTracker.userContactInfo.country
-    }
+    },
+    invoiceSequenceByPeriod: { ...(workTracker.invoiceSequenceByPeriod ?? {}) }
   };
 }
 

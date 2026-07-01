@@ -1,4 +1,5 @@
 import { formatCalendarDateLabel } from "./calendar";
+import { escapeHtml } from "./htmlEscape";
 import type { ShoppingListItem } from "./shoppingList";
 
 /**
@@ -29,16 +30,6 @@ function formatItemAmount(item: ShoppingListItem): string {
   }
 
   return item.unit ? `${item.quantity} ${item.unit}` : `${item.quantity}`;
-}
-
-/**
- * Escapes HTML-sensitive characters so arbitrary text can be safely interpolated into markup.
- *
- * @param text - Raw text to escape.
- * @returns Text with `&`, `<`, `>`, and `"` replaced by their HTML entities.
- */
-function escapeHtml(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 /**

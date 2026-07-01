@@ -18,6 +18,7 @@ import {
 import type { WorkTrackerPersistedData, WorkTrackerStore } from "./workTrackerStore.types";
 
 export type {
+  InvoiceSequenceByPeriod,
   UserContactInfo,
   WorkClient,
   WorkDateKey,
@@ -31,7 +32,8 @@ const initialState: WorkTrackerPersistedData = {
   clients: [],
   projects: [],
   entriesByDate: {},
-  userContactInfo: BLANK_USER_CONTACT_INFO
+  userContactInfo: BLANK_USER_CONTACT_INFO,
+  invoiceSequenceByPeriod: {}
 };
 
 /**
@@ -42,11 +44,16 @@ export const useWorkTrackerStore = create<WorkTrackerStore>()(
   persist(
     (set) => ({
       ...initialState,
-      addClient: (name, contactName, contactEmail, company) =>
-        set((state) => ({ clients: [...state.clients, createClient(name, contactName, contactEmail, company)] })),
-      updateClient: (id, name, contactName, contactEmail, company) =>
+      addClient: (name, contactName, contactEmail, clientCode, paymentTerms, company) =>
         set((state) => ({
-          clients: updateClientInList(state.clients, id, name, contactName, contactEmail, company)
+          clients: [
+            ...state.clients,
+            createClient(name, contactName, contactEmail, clientCode, paymentTerms, company)
+          ]
+        })),
+      updateClient: (id, name, contactName, contactEmail, clientCode, paymentTerms, company) =>
+        set((state) => ({
+          clients: updateClientInList(state.clients, id, name, contactName, contactEmail, clientCode, paymentTerms, company)
         })),
       deleteClient: (id) =>
         set((state) => {
@@ -85,15 +92,25 @@ export const useWorkTrackerStore = create<WorkTrackerStore>()(
       updateUserContactInfo: (patch) =>
         set((state) => ({ userContactInfo: { ...state.userContactInfo, ...patch } })),
 
+      recordInvoiceIndex: (periodKey, index) =>
+        set((state) => ({ invoiceSequenceByPeriod: { ...state.invoiceSequenceByPeriod, [periodKey]: index } })),
+
       replaceWorkTrackerData: (data) =>
         set({
           clients: data.clients,
           projects: data.projects,
           entriesByDate: data.entriesByDate,
-          userContactInfo: data.userContactInfo
+          userContactInfo: data.userContactInfo,
+          invoiceSequenceByPeriod: data.invoiceSequenceByPeriod
         }),
       resetWorkTrackerStore: () =>
-        set({ clients: [], projects: [], entriesByDate: {}, userContactInfo: BLANK_USER_CONTACT_INFO })
+        set({
+          clients: [],
+          projects: [],
+          entriesByDate: {},
+          userContactInfo: BLANK_USER_CONTACT_INFO,
+          invoiceSequenceByPeriod: {}
+        })
     }),
     {
       name: "sp9000-work-tracker-state",

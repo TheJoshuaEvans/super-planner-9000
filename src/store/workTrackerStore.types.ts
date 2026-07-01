@@ -9,6 +9,10 @@ export type WorkClient = {
   contactName: string;
   /** Point-of-contact email address for this client. */
   contactEmail: string;
+  /** Unique 3-character (letters/digits) code identifying this client on invoice numbers. */
+  clientCode: string;
+  /** Number of days after an invoice is submitted before payment is due (e.g. 30 for "Net 30"). */
+  paymentTerms: number;
   /** Optional company/organization name for this client. */
   company?: string;
 };
@@ -61,6 +65,12 @@ export type UserContactInfo = {
 };
 
 /**
+ * Tracks the last-used invoice index per billing period, keyed by `"<CLIENT_CODE>-<YYYY>-<MM>"`.
+ * The next invoice for that period defaults to one more than the stored value.
+ */
+export type InvoiceSequenceByPeriod = Record<string, number>;
+
+/**
  * Persisted work tracker data that should be exported/imported as a unit.
  */
 export type WorkTrackerPersistedData = {
@@ -68,16 +78,32 @@ export type WorkTrackerPersistedData = {
   projects: WorkProject[];
   entriesByDate: WorkEntriesByDate;
   userContactInfo: UserContactInfo;
+  invoiceSequenceByPeriod: InvoiceSequenceByPeriod;
 };
 
 /**
  * Work tracker store state plus all actions exposed to the UI.
  */
 export type WorkTrackerStore = WorkTrackerPersistedData & {
-  /** Adds a new client to the library, with a point-of-contact name and email, and an optional company name. */
-  addClient: (name: string, contactName: string, contactEmail: string, company?: string) => void;
-  /** Updates the name, point-of-contact name/email, and company name of an existing client by id. */
-  updateClient: (id: string, name: string, contactName: string, contactEmail: string, company?: string) => void;
+  /** Adds a new client to the library, with a point-of-contact name/email, a unique client code, payment terms, and an optional company name. */
+  addClient: (
+    name: string,
+    contactName: string,
+    contactEmail: string,
+    clientCode: string,
+    paymentTerms: number,
+    company?: string
+  ) => void;
+  /** Updates the name, point-of-contact name/email, client code, payment terms, and company name of an existing client by id. */
+  updateClient: (
+    id: string,
+    name: string,
+    contactName: string,
+    contactEmail: string,
+    clientCode: string,
+    paymentTerms: number,
+    company?: string
+  ) => void;
   /** Removes a client, cascading to remove its projects and any entries logged against them. */
   deleteClient: (id: string) => void;
 
@@ -97,6 +123,9 @@ export type WorkTrackerStore = WorkTrackerPersistedData & {
 
   /** Updates one or more fields of the user's own contact info (name/email/phone/address parts). */
   updateUserContactInfo: (patch: Partial<UserContactInfo>) => void;
+
+  /** Records the last-used invoice index for a billing period (e.g. after generating an invoice). */
+  recordInvoiceIndex: (periodKey: string, index: number) => void;
 
   /** Replaces the entire persisted state (used by data import). */
   replaceWorkTrackerData: (data: WorkTrackerPersistedData) => void;

@@ -2,8 +2,12 @@ import { useState, type FormEvent } from "react";
 import {
   countEntriesUsingProject,
   countProjectsUsingClient,
+  DEFAULT_PAYMENT_TERMS_DAYS,
+  isClientCodeTaken,
   isClientNameTaken,
-  isMalformedEmail
+  isMalformedEmail,
+  isValidClientCode,
+  parsePaymentTermsInput
 } from "../../lib/workTrackerData";
 import { useConfirmDialogStore } from "../../store/confirmDialogStore";
 import { useWorkTrackerStore } from "../../store/workTrackerStore";
@@ -42,15 +46,23 @@ function ClientsPanel() {
   const [mode, setMode] = useState<FormMode>("list");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formName, setFormName] = useState("");
+  const [formClientCode, setFormClientCode] = useState("");
+  const [formPaymentTermsText, setFormPaymentTermsText] = useState(String(DEFAULT_PAYMENT_TERMS_DAYS));
   const [formCompany, setFormCompany] = useState("");
   const [formContactName, setFormContactName] = useState("");
   const [formContactEmail, setFormContactEmail] = useState("");
 
   const nameTaken = isClientNameTaken(clients, formName, editingId ?? undefined);
+  const clientCodeValid = isValidClientCode(formClientCode);
+  const clientCodeTaken = isClientCodeTaken(clients, formClientCode, editingId ?? undefined);
+  const parsedPaymentTerms = parsePaymentTermsInput(formPaymentTermsText);
   const emailMalformed = isMalformedEmail(formContactEmail);
   const canSave =
     formName.trim().length > 0 &&
     !nameTaken &&
+    clientCodeValid &&
+    !clientCodeTaken &&
+    parsedPaymentTerms !== null &&
     formContactName.trim().length > 0 &&
     formContactEmail.trim().length > 0 &&
     !emailMalformed;
@@ -62,6 +74,8 @@ function ClientsPanel() {
     setMode("add");
     setEditingId(null);
     setFormName("");
+    setFormClientCode("");
+    setFormPaymentTermsText(String(DEFAULT_PAYMENT_TERMS_DAYS));
     setFormCompany("");
     setFormContactName("");
     setFormContactEmail("");
@@ -76,6 +90,8 @@ function ClientsPanel() {
     setMode("edit");
     setEditingId(client.id);
     setFormName(client.name);
+    setFormClientCode(client.clientCode ?? "");
+    setFormPaymentTermsText(String(client.paymentTerms ?? DEFAULT_PAYMENT_TERMS_DAYS));
     setFormCompany(client.company ?? "");
     setFormContactName(client.contactName ?? "");
     setFormContactEmail(client.contactEmail ?? "");
@@ -88,6 +104,8 @@ function ClientsPanel() {
     setMode("list");
     setEditingId(null);
     setFormName("");
+    setFormClientCode("");
+    setFormPaymentTermsText(String(DEFAULT_PAYMENT_TERMS_DAYS));
     setFormCompany("");
     setFormContactName("");
     setFormContactEmail("");
@@ -100,11 +118,11 @@ function ClientsPanel() {
    */
   function handleSubmit(event: FormEvent): void {
     event.preventDefault();
-    if (!canSave) return;
+    if (!canSave || parsedPaymentTerms === null) return;
     if (mode === "add") {
-      addClient(formName, formContactName, formContactEmail, formCompany);
+      addClient(formName, formContactName, formContactEmail, formClientCode, parsedPaymentTerms, formCompany);
     } else if (mode === "edit" && editingId) {
-      updateClient(editingId, formName, formContactName, formContactEmail, formCompany);
+      updateClient(editingId, formName, formContactName, formContactEmail, formClientCode, parsedPaymentTerms, formCompany);
     }
     handleCancel();
   }
@@ -146,8 +164,9 @@ function ClientsPanel() {
         <div className="space-y-1">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-app-muted">Clients</h3>
           <p className="text-sm text-app-text">
-            Add, rename, or remove clients. Every client needs a point of contact. Projects are scoped to a client,
-            but client data isn't used by hour tracking yet.
+            Add, rename, or remove clients. Every client needs a point of contact, a unique 3-character code used
+            to number their invoices, and payment terms (days until an invoice is due). Projects are scoped to a
+            client.
           </p>
         </div>
         {mode === "list" && (
@@ -174,6 +193,39 @@ function ClientsPanel() {
               />
               {nameTaken && formName.trim().length > 0 && (
                 <p className="text-xs text-red-400">A client with this name already exists.</p>
+              )}
+            </div>
+            <div className="w-20 shrink-0 space-y-1">
+              <input
+                type="text"
+                placeholder="Code"
+                value={formClientCode}
+                onChange={(e) => setFormClientCode(e.target.value.toUpperCase())}
+                maxLength={3}
+                aria-label="Client code"
+                className={inputClassName}
+              />
+              {formClientCode.trim().length > 0 && !clientCodeValid && (
+                <p className="text-xs text-red-400">3 letters/digits.</p>
+              )}
+              {clientCodeValid && clientCodeTaken && <p className="text-xs text-red-400">Already used.</p>}
+            </div>
+            <div className="w-32 shrink-0 space-y-1">
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  step="1"
+                  min="0"
+                  placeholder="Terms"
+                  value={formPaymentTermsText}
+                  onChange={(e) => setFormPaymentTermsText(e.target.value)}
+                  aria-label="Payment terms in days"
+                  className={inputClassName}
+                />
+                <span className="text-sm text-app-muted">days</span>
+              </div>
+              {parsedPaymentTerms === null && formPaymentTermsText.trim().length > 0 && (
+                <p className="text-xs text-red-400">Enter 0 or more days.</p>
               )}
             </div>
             <input
@@ -228,14 +280,19 @@ function ClientsPanel() {
                   isBeingEdited ? "border-app-accent/50 bg-app-panel" : "border-app-border bg-app-panel/60"
                 }`}
               >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-app-text">
-                    {client.name}
-                    {client.company && <span className="font-normal text-app-muted"> · {client.company}</span>}
-                  </p>
-                  <p className="truncate text-xs text-app-muted">
-                    {client.contactName ?? ""} · {client.contactEmail ?? ""}
-                  </p>
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="shrink-0 rounded-sm border border-app-border px-1.5 py-0.5 text-[0.65rem] font-mono uppercase text-app-muted">
+                    {client.clientCode || "—"}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-app-text">
+                      {client.name}
+                      {client.company && <span className="font-normal text-app-muted"> · {client.company}</span>}
+                    </p>
+                    <p className="truncate text-xs text-app-muted">
+                      {client.contactName ?? ""} · {client.contactEmail ?? ""} · Net {client.paymentTerms ?? DEFAULT_PAYMENT_TERMS_DAYS}
+                    </p>
+                  </div>
                 </div>
                 {mode === "list" && (
                   <div className="flex shrink-0 gap-1">

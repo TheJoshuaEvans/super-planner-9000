@@ -1,9 +1,20 @@
-import type { MonthlyInvoiceOverview } from "../../lib/workTrackerInvoice";
+import { useState } from "react";
+import InvoiceConfirmDialog from "./InvoiceConfirmDialog";
+import { isValidClientCode } from "../../lib/workTrackerData";
+import { buildInvoiceCode, buildInvoicePeriodKey, getNextInvoiceIndex } from "../../lib/workTrackerInvoice";
+import type { ClientInvoiceGroup, MonthlyInvoiceOverview } from "../../lib/workTrackerInvoice";
+import { buildInvoicePrintHtml, formatInvoiceDateLabel } from "../../lib/workTrackerInvoicePrint";
+import { useToastStore } from "../../store/toastStore";
+import { useWorkTrackerStore } from "../../store/workTrackerStore";
 
 type InvoiceOverviewProps = {
   overview: MonthlyInvoiceOverview;
   monthLabel: string;
+  visibleMonth: Date;
 };
+
+const generateInvoiceButtonClassName =
+  "shrink-0 rounded-md bg-app-accent px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-app-accentStrong";
 
 /**
  * Formats a dollar amount with two decimal places and a leading "$".
@@ -17,11 +28,80 @@ function formatCurrency(value: number): string {
 
 /**
  * Work Tracker card showing a per-client, per-project breakdown of hours and value earned for
- * the visible month, with subtotals per client/project and a grand total — a lightweight
- * precursor to generating an actual invoice document.
+ * the visible month, with subtotals per client/project, a grand total, and a "Generate Invoice"
+ * button per client that previews and prints an actual invoice document.
  */
-function InvoiceOverview({ overview, monthLabel }: InvoiceOverviewProps) {
+function InvoiceOverview({ overview, monthLabel, visibleMonth }: InvoiceOverviewProps) {
   const { clientGroups, grandTotalEarned } = overview;
+
+  const userContactInfo = useWorkTrackerStore((state) => state.userContactInfo);
+  const invoiceSequenceByPeriod = useWorkTrackerStore((state) => state.invoiceSequenceByPeriod);
+  const recordInvoiceIndex = useWorkTrackerStore((state) => state.recordInvoiceIndex);
+  const showToast = useToastStore((state) => state.showToast);
+
+  const [pendingInvoice, setPendingInvoice] = useState<{ group: ClientInvoiceGroup; submittedDate: Date } | null>(
+    null
+  );
+
+  /**
+   * Opens the invoice confirmation dialog for a client group, or shows a guidance toast instead
+   * if the client doesn't have a valid client code yet (e.g. it predates this feature and the
+   * live store was never migrated — migrations only run on JSON import/Drive restore). Captures
+   * "now" as the submitted date once, here, so it stays consistent between the dialog's default
+   * due-date calculation and the final printed document.
+   *
+   * @param group - The client group to generate an invoice for.
+   */
+  function handleGenerateInvoiceClick(group: ClientInvoiceGroup): void {
+    if (!isValidClientCode(group.clientCode)) {
+      showToast({
+        title: "Client code required",
+        message: `Add a client code for ${group.clientName} in Settings → Clients first.`,
+        level: "error"
+      });
+      return;
+    }
+
+    setPendingInvoice({ group, submittedDate: new Date() });
+  }
+
+  /**
+   * Records the confirmed invoice index for this client/period, then opens a new window with the
+   * printable invoice document and triggers its print dialog.
+   *
+   * @param finalIndex - The invoice index the user confirmed (default or manually overridden).
+   * @param dueDate - The due date the user confirmed (default or manually overridden).
+   */
+  function handleConfirmInvoice(finalIndex: number, dueDate: Date): void {
+    if (!pendingInvoice) {
+      return;
+    }
+
+    const { group, submittedDate } = pendingInvoice;
+    const periodKey = buildInvoicePeriodKey(group.clientCode, visibleMonth);
+    recordInvoiceIndex(periodKey, finalIndex);
+
+    const invoiceCode = buildInvoiceCode(periodKey, finalIndex);
+    const printWindow = window.open("", "_blank");
+
+    if (printWindow) {
+      printWindow.document.open();
+      printWindow.document.write(
+        buildInvoicePrintHtml(
+          group,
+          monthLabel,
+          userContactInfo,
+          formatInvoiceDateLabel(submittedDate),
+          formatInvoiceDateLabel(dueDate),
+          invoiceCode
+        )
+      );
+      printWindow.document.close();
+      printWindow.focus();
+    }
+
+    setPendingInvoice(null);
+  }
 
   return (
     <section className="rounded-lg border border-app-border bg-app-surface p-4">
@@ -38,7 +118,17 @@ function InvoiceOverview({ overview, monthLabel }: InvoiceOverviewProps) {
             <div key={group.clientId} className="space-y-2 rounded-md border border-app-border bg-app-panel/60 p-3">
               <div className="flex items-center justify-between gap-3">
                 <p className="truncate text-sm font-semibold text-app-text">{group.clientName}</p>
-                <p className="shrink-0 text-sm font-semibold text-app-text">{formatCurrency(group.totalEarned)}</p>
+                <div className="flex shrink-0 items-center gap-2">
+                  <p className="text-sm font-semibold text-app-text">{formatCurrency(group.totalEarned)}</p>
+                  <button
+                    type="button"
+                    onClick={() => handleGenerateInvoiceClick(group)}
+                    aria-label={`Generate invoice for ${group.clientName}`}
+                    className={generateInvoiceButtonClassName}
+                  >
+                    Generate Invoice
+                  </button>
+                </div>
               </div>
 
               <ul className="space-y-1">
@@ -68,6 +158,21 @@ function InvoiceOverview({ overview, monthLabel }: InvoiceOverviewProps) {
           </div>
         </div>
       )}
+
+      {pendingInvoice ? (
+        <InvoiceConfirmDialog
+          group={pendingInvoice.group}
+          billingPeriodLabel={monthLabel}
+          periodKey={buildInvoicePeriodKey(pendingInvoice.group.clientCode, visibleMonth)}
+          defaultIndex={getNextInvoiceIndex(
+            invoiceSequenceByPeriod,
+            buildInvoicePeriodKey(pendingInvoice.group.clientCode, visibleMonth)
+          )}
+          submittedDate={pendingInvoice.submittedDate}
+          onConfirm={handleConfirmInvoice}
+          onCancel={() => setPendingInvoice(null)}
+        />
+      ) : null}
     </section>
   );
 }

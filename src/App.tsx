@@ -156,7 +156,8 @@ function App() {
         clients: workTrackerState.clients,
         projects: workTrackerState.projects,
         entriesByDate: workTrackerState.entriesByDate,
-        userContactInfo: workTrackerState.userContactInfo
+        userContactInfo: workTrackerState.userContactInfo,
+        invoiceSequenceByPeriod: workTrackerState.invoiceSequenceByPeriod
       }
     );
     const blob = new Blob([exportedJson], { type: "application/json;charset=utf-8" });

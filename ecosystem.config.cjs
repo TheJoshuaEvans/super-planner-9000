@@ -11,7 +11,7 @@ module.exports = {
       name: 'super-planner-9000',
       cwd: '.',
       script: 'npm',
-      args: ['run', 'dev', '--', '--host', '0.0.0.0', '--port', '5173'],
+      args: ['run', 'dev', '--', '--host', '0.0.0.0'],
       exec_mode: 'fork',
       autorestart: true,
       watch: false,
